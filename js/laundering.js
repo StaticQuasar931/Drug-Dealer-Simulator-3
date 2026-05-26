@@ -1,55 +1,41 @@
-/* Laundering - Front businesses, dirty→clean money conversion */
+'use strict';
+/* ── Laundering ── */
 const Laundering = (() => {
 
-  function purchaseFront(state, frontId) {
-    const def = GAME_DATA.fronts.find(f => f.id === frontId);
-    if (!def) return { success: false, reason: 'Unknown front' };
-
+  function buyFront(state, frontId) {
+    const f = FRONTS.find(x => x.id === frontId);
+    if (!f) return { ok:false, reason:'Unknown front' };
     const count = state.fronts[frontId] || 0;
-    // Each additional front costs 3× more
-    const cost = Math.floor(def.cost * Math.pow(3, count));
-    const totalCash = state.cash + state.cleanCash;
-    if (totalCash < cost) return { success: false, reason: `Need ${Economy.formatCash(cost)}` };
-
-    if (state.cash >= cost) {
-      state.cash -= cost;
-    } else {
-      const rem = cost - state.cash;
-      state.cash = 0;
-      state.cleanCash = Math.max(0, state.cleanCash - rem);
-    }
-
+    const cost  = Math.floor(f.cost * Math.pow(3, count));
+    if ((state.cash + state.cleanCash) < cost) return { ok:false, reason:`Need ${Economy.fmt(cost)}` };
+    Production.deductCash(state, cost);
     state.fronts[frontId] = count + 1;
-    state.stats.frontsOwned = (state.stats.frontsOwned || 0) + 1;
-    return { success: true, name: def.name, cost };
+    state.stats.totalFronts = (state.stats.totalFronts||0) + 1;
+    return { ok:true, name:f.name, cost };
   }
 
-  function getFrontCost(state, frontId) {
-    const def = GAME_DATA.fronts.find(f => f.id === frontId);
-    if (!def) return Infinity;
-    const count = state.fronts[frontId] || 0;
-    return Math.floor(def.cost * Math.pow(3, count));
+  function frontCost(state, frontId) {
+    const f = FRONTS.find(x => x.id === frontId);
+    if (!f) return Infinity;
+    return Math.floor(f.cost * Math.pow(3, state.fronts[frontId]||0));
   }
 
-  function processTick(state, deltaSeconds) {
+  function totalFronts(state) {
+    return Object.values(state.fronts).reduce((s,n) => s+n, 0);
+  }
+
+  function tick(state, dt) {
     const rate = Economy.getLaunderRate(state);
     if (rate <= 0 || state.cash <= 0) return 0;
-
-    const maxLaunder = rate * deltaSeconds;
-    const actual = Math.min(maxLaunder, state.cash);
-    const efficiency = state.launderEfficiency || 0.80;
-
-    state.cash -= actual;
-    const clean = actual * efficiency;
+    const max    = rate * dt;
+    const actual = Math.min(max, state.cash);
+    const eff    = state.launderEfficiency || 0.80;
+    state.cash      -= actual;
+    const clean = actual * eff;
     state.cleanCash += clean;
-    state.totalLaundered = (state.totalLaundered || 0) + clean;
-
+    state.totalLaundered = (state.totalLaundered||0) + clean;
     return clean;
   }
 
-  function getTotalFronts(state) {
-    return Object.values(state.fronts).reduce((a, b) => a + b, 0);
-  }
-
-  return { purchaseFront, getFrontCost, processTick, getTotalFronts };
+  return { buyFront, frontCost, totalFronts, tick };
 })();

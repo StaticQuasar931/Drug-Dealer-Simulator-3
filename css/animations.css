@@ -1,137 +1,73 @@
-/* animations.css — All keyframes and animation classes */
+/* ── Keyframes ── */
 
-/* ── Float up (cash) ── */
 @keyframes float-up {
   0%   { opacity: 1;   transform: translateX(-50%) translateY(0); }
-  70%  { opacity: 1;   transform: translateX(-50%) translateY(-60px); }
-  100% { opacity: 0;   transform: translateX(-50%) translateY(-90px); }
+  100% { opacity: 0;   transform: translateX(-50%) translateY(-60px); }
 }
 
-/* ── Heat pulse (raid state) ── */
-@keyframes heat-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.6; }
+@keyframes raid-pulse {
+  from { box-shadow: 0 0 0 0 rgba(220,38,38,0.5); }
+  to   { box-shadow: 0 0 12px 4px rgba(220,38,38,0.8); }
+}
+
+@keyframes heat-flicker {
+  from { opacity: 0.8; }
+  to   { opacity: 1;   }
+}
+
+@keyframes bar-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(168,85,247,0.6); }
+  70%  { box-shadow: 0 0 0 6px rgba(168,85,247,0); }
+  100% { box-shadow: 0 0 0 0 rgba(168,85,247,0); }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes card-appear {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 /* ── Raid flash ── */
-@keyframes raid-flash {
-  0%   { background-color: transparent; }
-  15%  { background-color: rgba(255, 0, 0, 0.18); }
-  30%  { background-color: transparent; }
-  45%  { background-color: rgba(255, 0, 0, 0.12); }
-  60%  { background-color: transparent; }
-  75%  { background-color: rgba(255, 0, 0, 0.08); }
-  100% { background-color: transparent; }
-}
 body.raid-flash::after {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: 999;
+  background: rgba(220,38,38,0.25);
   pointer-events: none;
-  animation: raid-flash 1s forwards;
+  z-index: 9999;
+  animation: raid-flash-anim 0.9s ease-out forwards;
+}
+@keyframes raid-flash-anim {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
 }
 
-/* ── Button ripple (raid) ── */
-@keyframes pulse-raid {
-  0%, 100% { box-shadow: 0 0 40px rgba(255,0,0,0.4), inset 0 0 40px rgba(255,0,0,0.10); }
-  50%       { box-shadow: 0 0 60px rgba(255,0,0,0.65), inset 0 0 60px rgba(255,0,0,0.18); }
-}
+/* ── Bar pulse on produce ── */
+.bar-pulse { animation: bar-pulse 0.4s ease-out; }
 
-/* ── Slide in notification ── */
-@keyframes slide-in-right {
-  from { transform: translateX(20px); opacity: 0; }
-  to   { transform: translateX(0);    opacity: 1; }
-}
-.notif { animation: slide-in-right 0.2s ease-out; }
+/* ── Graphics quality classes ── */
+body.gfx-low .produce-bar-fill   { transition: none; }
+body.gfx-low .heat-bar-fill      { transition: none; }
+body.gfx-low .btn                { transition: none; }
+body.gfx-low .product-card       { transition: none; }
 
-/* ── Glow pulse (deal button idle) ── */
-@keyframes glow-idle {
-  0%, 100% { box-shadow: 0 0 30px rgba(0,255,136,0.20), inset 0 0 30px rgba(0,255,136,0.05); }
-  50%       { box-shadow: 0 0 45px rgba(0,255,136,0.30), inset 0 0 45px rgba(0,255,136,0.08); }
-}
-.deal-btn--safe { animation: glow-idle 3s ease-in-out infinite; }
+body.gfx-high #active-drug-icon  { box-shadow: 0 0 40px rgba(124,58,237,0.25); }
+body.gfx-high #produce-btn:hover { box-shadow: 0 8px 32px rgba(124,58,237,0.6), 0 0 0 1px rgba(168,85,247,0.4); }
 
-/* ── Achievement popup spring ── */
-@keyframes ach-in {
-  0%   { transform: translateX(120%) scale(0.9); }
-  70%  { transform: translateX(-5%) scale(1.03); }
-  100% { transform: translateX(0)  scale(1); }
-}
-.ach-popup--visible { animation: ach-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+/* Animation intensity */
+body.anim-none .float-cash,
+body.anim-none .float-produce,
+body.anim-none .ach-popup { display: none; }
 
-/* ── Card hover shimmer ── */
-@keyframes shimmer {
-  from { background-position: -200px 0; }
-  to   { background-position: 200px  0; }
-}
+body.anim-none body.raid-flash::after { display: none; }
 
-/* ── Scan line (high graphics) ── */
-@keyframes scan {
-  0%   { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
-}
-.gfx-high body::after {
-  content: '';
-  position: fixed;
-  left: 0; right: 0;
-  height: 2px;
-  background: rgba(0,255,136,0.06);
-  z-index: 1;
-  pointer-events: none;
-  animation: scan 8s linear infinite;
-}
+body.anim-low .float-cash,
+body.anim-low .float-produce { animation-duration: 0.5s; }
 
-/* ── Neon text pulse ── */
-@keyframes neon-pulse {
-  0%, 100% { text-shadow: 0 0 5px currentColor, 0 0 10px currentColor; }
-  50%       { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 40px currentColor; }
-}
-
-/* ── Low graphics overrides ── */
-.gfx-low .deal-btn--safe { animation: none !important; }
-.gfx-low .heat-fill { transition: none !important; }
-.gfx-low .deal-btn  { transition: none !important; }
-.gfx-low .item-card,
-.gfx-low .worker-card,
-.gfx-low .upgrade-card { transition: none !important; }
-
-/* ── Animation intensity overrides ── */
-.anim-none * { animation: none !important; transition: none !important; }
-.anim-low  .float-cash { animation: none !important; display: none; }
-.anim-none .float-cash { display: none; }
-
-/* ── Content warning fade in ── */
-@keyframes fade-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to   { opacity: 1; transform: scale(1); }
-}
-#content-warning-modal .modal { animation: fade-in 0.4s ease-out; }
-
-/* ── Tab underline slide ── */
-.panel-tab {
-  position: relative;
-  overflow: hidden;
-}
-.panel-tab::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 50%;
-  width: 0; height: 2px;
-  background: var(--accent-green);
-  transition: all 0.25s;
-  transform: translateX(-50%);
-}
-.panel-tab.active::after { width: 60%; }
-
-/* ── Progress bar (general) ── */
-@keyframes bar-fill {
-  from { width: 0; }
-}
-.progress-bar { animation: bar-fill 0.5s ease-out; }
-
-/* ── Number counter roll ── */
-@keyframes count-up {
-  from { transform: translateY(8px); opacity: 0; }
-  to   { transform: translateY(0);   opacity: 1; }
-}
+body.anim-high .float-cash,
+body.anim-high .float-produce { font-size: 20px; animation-duration: 1.2s; }
+body.anim-high #produce-btn:active { animation: bar-pulse 0.3s ease-out; }

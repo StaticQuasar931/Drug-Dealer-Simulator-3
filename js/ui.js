@@ -1,566 +1,581 @@
-/* UI - Rendering, panels, notifications, modals */
+'use strict';
+/* ── UI — render, effects, modals ── */
 const UI = (() => {
 
-  let _activeTab   = 'products';
-  let _activeRTab  = 'workers';
+  let _rTab = 'workers'; // right panel tab
+  let _floatId = 0;
   let _initialized = false;
-  let _floatId     = 0;
 
-  /* ── Init ── */
-  function init(state) {
+  /* ══════════ INIT ══════════ */
+  function init() {
     if (_initialized) return;
     _initialized = true;
 
-    // Tab buttons
-    document.querySelectorAll('[data-tab]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        _activeTab = btn.dataset.tab;
-        document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        render(Game.getState());
-      });
-    });
-
+    // Right-panel tabs
     document.querySelectorAll('[data-rtab]').forEach(btn => {
       btn.addEventListener('click', () => {
-        _activeRTab = btn.dataset.rtab;
+        _rTab = btn.dataset.rtab;
         document.querySelectorAll('[data-rtab]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        render(Game.getState());
+        _renderRightPanel(Game.getState());
       });
     });
 
-    // Deal button
-    document.getElementById('deal-btn')?.addEventListener('click', () => {
-      Game.deal();
-    });
+    // Produce / Sell buttons
+    document.getElementById('produce-btn')?.addEventListener('click', () => Game.produce());
+    document.getElementById('sell-one-btn')?.addEventListener('click', () => Game.sellOne());
+    document.getElementById('sell-all-btn')?.addEventListener('click', () => Game.sellAll());
 
-    // Action buttons
+    // Heat actions
     document.getElementById('lay-low-btn')?.addEventListener('click', () => Game.layLow());
     document.getElementById('bribe-btn')?.addEventListener('click', () => Game.bribe());
+    document.getElementById('lay-low-btn-f')?.addEventListener('click', () => Game.layLow());
+    document.getElementById('bribe-btn-f')?.addEventListener('click', () => Game.bribe());
 
-    // Settings panel
-    document.getElementById('settings-btn')?.addEventListener('click', () => toggleModal('settings-modal'));
+    // Header actions
     document.getElementById('save-btn')?.addEventListener('click', () => Game.manualSave());
+    document.getElementById('settings-btn')?.addEventListener('click', () => toggleModal('settings-modal'));
 
-    // Admin panel (hidden - accessed by konami code or clicking title 7 times)
-    setupAdminAccess();
+    // Product list — event delegation
+    document.getElementById('product-list')?.addEventListener('click', e => {
+      const card = e.target.closest('[data-product-id]');
+      if (card) Game.switchProduct(card.dataset.productId);
+    });
 
-    // Close modals on backdrop click
+    // Right panel — event delegation (reattached each render via _bindRight)
+    _setupRightDelegation();
+
+    // Admin
+    _setupAdmin();
+
+    // Modal backdrops
     document.querySelectorAll('.modal-backdrop').forEach(el => {
-      el.addEventListener('click', (e) => {
-        if (e.target === el) el.classList.add('hidden');
-      });
+      el.addEventListener('click', e => { if (e.target === el) el.classList.add('hidden'); });
+    });
+
+    // Event choice buttons
+    document.getElementById('choice-accept')?.addEventListener('click', () => Game.resolveChoice(true));
+    document.getElementById('choice-refuse')?.addEventListener('click', () => Game.resolveChoice(false));
+  }
+
+  function _setupRightDelegation() {
+    const panel = document.getElementById('right-panel-content');
+    if (!panel) return;
+    panel.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn || btn.disabled) return;
+      const { action, id } = btn.dataset;
+      if (action === 'hire')      Game.hireWorker(id);
+      if (action === 'upgrade')   Game.buyUpgrade(id);
+      if (action === 'front')     Game.buyFront(id);
+      if (action === 'territory') Game.claimTerritory(id);
     });
   }
 
-  /* ── Main render ── */
+  function _setupAdmin() {
+    const konami = [38,38,40,40,37,39,37,39,66,65];
+    let idx = 0;
+    document.addEventListener('keydown', e => {
+      idx = e.keyCode === konami[idx] ? idx + 1 : 0;
+      if (idx === konami.length) { idx = 0; toggleModal('admin-modal'); }
+    });
+    document.getElementById('admin-1k')?.addEventListener('click',       () => Game.adminCash(1000));
+    document.getElementById('admin-1m')?.addEventListener('click',       () => Game.adminCash(1000000));
+    document.getElementById('admin-1b')?.addEventListener('click',       () => Game.adminCash(1000000000));
+    document.getElementById('admin-heat0')?.addEventListener('click',    () => Game.adminHeat(0));
+    document.getElementById('admin-heat100')?.addEventListener('click',  () => Game.adminHeat(100));
+    document.getElementById('admin-unlock')?.addEventListener('click',   () => Game.adminUnlockAll());
+    document.getElementById('admin-reset')?.addEventListener('click',    () => Game.resetGame());
+  }
+
+  /* ══════════ MAIN RENDER ══════════ */
   function render(state) {
-    renderHeader(state);
-    renderDealButton(state);
-    renderLeftPanel(state);
-    renderRightPanel(state);
-    renderHeatBar(state);
-    renderActionButtons(state);
+    _renderHeader(state);
+    _renderCenter(state);
+    _renderProductList(state);
+    _renderRightPanel(state);
+    _renderHeat(state);
+    _renderEventChoice(state);
   }
 
   /* ── Header ── */
-  function renderHeader(state) {
-    setText('dirty-cash',    Economy.formatCash(state.cash));
-    setText('clean-cash',    Economy.formatCash(state.cleanCash));
-    setText('total-earned',  Economy.formatCash(state.totalEarned));
+  function _renderHeader(state) {
+    _t('hdr-dirty',   Economy.fmt(state.cash));
+    _t('hdr-clean',   Economy.fmt(state.cleanCash));
+    _t('hdr-earned',  Economy.fmt(state.totalEarned));
+    _t('hdr-income',  Economy.fmt(Economy.getAutoSellRate(state) * Economy.getSellPrice(state, state.activeProduct)) + '/s');
+    _t('hdr-launder', Economy.fmt(Economy.getLaunderRate(state)) + '/s');
 
-    const wIncome = Economy.getWorkerIncome(state);
-    const laundRate = Economy.getLaunderRate(state);
-    setText('income-rate',   Economy.formatCash(wIncome) + '/s');
-    setText('launder-rate',  Economy.formatCash(laundRate) + '/s');
-
-    const achCount = Achievements.getEarnedCount(state);
-    setText('ach-count', achCount + '/' + GAME_DATA.achievements.length);
+    // Mini heat chip
+    const h = state.heat;
+    const chip = document.getElementById('hdr-heat');
+    if (chip) {
+      const [label, cls] = h < 25 ? ['😎 Cool','heat-cool'] :
+                           h < 50 ? ['👀 Notice','heat-warm'] :
+                           h < 75 ? ['🚨 Hot','heat-hot'] :
+                           h < 90 ? ['🔴 Danger','heat-danger'] :
+                                    ['💀 RAID!','heat-raid'];
+      chip.textContent = label;
+      chip.className = 'hdr-heat-chip ' + cls;
+    }
   }
 
-  /* ── Deal button ── */
-  function renderDealButton(state) {
-    const btn = document.getElementById('deal-btn');
-    if (!btn) return;
+  /* ── Center produce/sell panel ── */
+  function _renderCenter(state) {
+    const prod = PRODUCTS.find(p => p.id === state.activeProduct);
+    if (!prod) return;
 
-    const item = GAME_DATA.items.find(i => i.id === state.activeItem);
-    if (!item) return;
+    // Drug icon
+    const iconEl = document.getElementById('active-drug-icon');
+    if (iconEl) iconEl.innerHTML = ICONS[prod.id] || prod.emoji;
 
-    const val = Economy.getClickValue(state);
-    setText('deal-item-name',  item.name);
-    setText('deal-click-val',  '+' + Economy.formatCash(val) + ' per deal');
+    // Name + flavor
+    _t('active-drug-name',   prod.name);
+    _t('active-drug-tier',   'Tier ' + prod.tier + ' · ' + (CATEGORIES[prod.cat]?.name || prod.cat));
+    _t('active-drug-flavor', prod.flavor);
 
-    // Heat indicator on button
-    const heatClass = state.heat < 25 ? 'safe' : state.heat < 50 ? 'warm' : state.heat < 75 ? 'hot' : state.heat < 90 ? 'danger' : 'raid';
-    btn.className = 'deal-btn deal-btn--' + heatClass;
+    // Progress bar
+    const progress = Math.min(1, state.production.progress || 0);
+    const bar = document.getElementById('produce-bar-fill');
+    if (bar) bar.style.width = (progress * 100).toFixed(1) + '%';
+
+    const barRate = Economy.getProduceBarRate(state);
+    const pText = progress >= 1
+      ? '✓ Ready to produce!'
+      : barRate > 0
+        ? `${(progress * 100).toFixed(0)}% — ~${((1 - progress) / barRate).toFixed(1)}s`
+        : `${(progress * 100).toFixed(0)}% — click PRODUCE`;
+    _t('produce-bar-label', pText);
+
+    // Stock + sell info
+    const stock = Math.floor(state.stock[state.activeProduct] || 0);
+    const price = Economy.getSellPrice(state, state.activeProduct);
+    _t('stock-count',   stock.toLocaleString() + ' units');
+    _t('sell-price-val', Economy.fmt(price) + ' / unit');
+    _t('total-val',      stock > 0 ? 'Total: ' + Economy.fmt(price * stock) : '');
+
+    // Sell buttons
+    const noStock = stock <= 0;
+    const sellOne = document.getElementById('sell-one-btn');
+    const sellAll = document.getElementById('sell-all-btn');
+    if (sellOne) sellOne.disabled = noStock;
+    if (sellAll) { sellAll.disabled = noStock; _t('sell-all-label', `Sell All (${stock})`); }
+
+    // Market ticker
+    const mod = Economy.getPriceMod();
+    const pct = Math.round((mod - 1) * 100);
+    const ticker = document.getElementById('market-ticker');
+    if (ticker) {
+      if (pct > 5)       ticker.innerHTML = `Market: <span class="price-up">▲ +${pct}% HOT</span>`;
+      else if (pct < -5) ticker.innerHTML = `Market: <span class="price-down">▼ ${pct}% Slow</span>`;
+      else               ticker.textContent = 'Market: Normal';
+    }
+
+    // Action button cooldowns
+    const ll = state.layLowCd > 0;
+    const br = state.bribeCd  > 0;
+    ['lay-low-btn','lay-low-btn-f'].forEach(id => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.disabled = ll;
+      b.textContent = ll ? `Lay Low (${Math.ceil(state.layLowCd)}s)` : '🕶️ Lay Low';
+    });
+    ['bribe-btn','bribe-btn-f'].forEach(id => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.disabled = br;
+      b.textContent = br ? `Bribe (${Math.ceil(state.bribeCd)}s)` : '💰 Bribe';
+    });
+
+    // Active events
+    const evEl = document.getElementById('active-events');
+    if (evEl) {
+      const active = Events.getActive();
+      evEl.innerHTML = active.map(ev =>
+        `<span class="event-badge">${ev.icon} ${ev.name} (${Math.ceil(ev.remaining)}s)</span>`
+      ).join('');
+    }
   }
 
-  /* ── Left panel (tabs: products / upgrades) ── */
+  /* ── Left: product list ── */
+  function _renderProductList(state) {
+    const list = document.getElementById('product-list');
+    if (!list) return;
 
-  function renderLeftPanel(state) {
-    const panel = document.getElementById('left-panel-content');
+    let html = '';
+    const catOrder = ['vapes','weed','psychedelics','pills','hard','black_market'];
+
+    for (const cat of catOrder) {
+      const prods = PRODUCTS.filter(p => p.cat === cat);
+      const meta  = CATEGORIES[cat] || { name: cat, color:'#888', emoji:'📦' };
+
+      // Category header — only show if any product is visible
+      const anyVisible = prods.some(p => {
+        if (p.unlockCost === 0) return true;
+        return state.totalEarned >= p.unlockCost * 0.5 || state.unlockedProducts[p.id];
+      });
+      if (!anyVisible) continue;
+
+      html += `<div class="cat-header" style="border-left-color:${meta.color}">${meta.emoji} ${meta.name}</div>`;
+
+      for (const p of prods) {
+        const unlocked = !!state.unlockedProducts[p.id];
+        const isActive = state.activeProduct === p.id;
+        const canSee   = p.unlockCost === 0 || state.totalEarned >= p.unlockCost * 0.5 || unlocked;
+        if (!canSee) continue;
+
+        const canUnlock = state.totalEarned >= p.unlockCost;
+        const stock = Math.floor(state.stock[p.id] || 0);
+
+        let cls = 'product-card';
+        if (isActive)              cls += ' product-card--active';
+        else if (!unlocked)        cls += ' product-card--locked';
+        if (!unlocked && canUnlock) cls += ' product-card--can-unlock';
+
+        const statusLabel = isActive
+          ? '<span class="prod-badge prod-badge--active">ACTIVE</span>'
+          : unlocked
+            ? '<span class="prod-badge">Switch</span>'
+            : canUnlock
+              ? '<span class="prod-badge prod-badge--unlock">Unlock</span>'
+              : `<span class="prod-badge prod-badge--cost">${Economy.fmt(p.unlockCost)}</span>`;
+
+        const stockBadge = unlocked && stock > 0
+          ? `<span class="prod-stock">${stock}</span>` : '';
+
+        html += `<div class="${cls}" data-product-id="${p.id}">
+          <div class="product-card__icon" style="background:${p.color}22">${ICONS[p.id] || p.emoji}</div>
+          <div class="product-card__info">
+            <div class="product-card__name">${p.name}${stockBadge}</div>
+            <div class="product-card__price">${Economy.fmt(p.basePrice)}/unit${isActive ? ' · T'+p.tier : ''}</div>
+          </div>
+          <div class="product-card__action">${statusLabel}</div>
+        </div>`;
+      }
+    }
+
+    list.innerHTML = html;
+  }
+
+  /* ── Right panel ── */
+  function _renderRightPanel(state) {
+    const panel = document.getElementById('right-panel-content');
     if (!panel) return;
 
-    if (_activeTab === 'products') {
-      panel.innerHTML = renderProducts(state);
-    } else if (_activeTab === 'upgrades') {
-      panel.innerHTML = renderUpgrades(state);
-    } else if (_activeTab === 'achievements') {
-      panel.innerHTML = renderAchievements(state);
+    switch (_rTab) {
+      case 'workers':     panel.innerHTML = _buildWorkers(state);      break;
+      case 'upgrades':    panel.innerHTML = _buildUpgrades(state);     break;
+      case 'fronts':      panel.innerHTML = _buildFronts(state);       break;
+      case 'territories': panel.innerHTML = _buildTerritories(state);  break;
+      case 'stats':       panel.innerHTML = _buildStats(state);        break;
+      case 'achievements':panel.innerHTML = _buildAchievements(state); break;
     }
-
-    // Attach click handlers after innerHTML
-    panel.querySelectorAll('[data-item-id]').forEach(el => {
-      el.addEventListener('click', () => Game.unlockItem(el.dataset.itemId));
-    });
-    panel.querySelectorAll('[data-upgrade-id]').forEach(el => {
-      el.addEventListener('click', () => Game.buyUpgrade(el.dataset.upgradeId));
-    });
   }
 
-  function renderProducts(state) {
-    let html = '<div class="section-title">Products</div>';
-    const totalEarned = state.totalEarned;
+  function _buildWorkers(state) {
+    const total = Workers.total(state);
+    let html = `<div class="section-title">Workers <span class="section-count">${total} total</span></div>`;
 
-    for (const item of GAME_DATA.items) {
-      const unlocked   = !!state.unlockedItems[item.id];
-      const isActive   = state.activeItem === item.id;
-      const canAfford  = item.unlockCash === 0 || (state.cash + state.cleanCash) >= item.unlockCash;
-      const canSee     = totalEarned >= item.unlockCash * 0.5 || unlocked;
+    for (const w of WORKERS) {
+      const count = state.workers[w.id] || 0;
+      const cost  = Economy.workerCost(w.id, count);
+      const canAfford = (state.cash + state.cleanCash) >= cost;
+      const visible = canAfford || count > 0 || state.totalEarned >= cost * 0.15;
+      if (!visible) continue;
 
-      if (!canSee && item.unlockCash > 0) continue;
+      const effects = [];
+      if (w.produceRate > 0) effects.push(`+${w.produceRate}/s produce`);
+      if (w.sellRate    > 0) effects.push(`+${w.sellRate}/s sell`);
+      if (w.heatReduce  > 0) effects.push(`-${w.heatReduce} heat/s`);
+      if (w.launderRate > 0) effects.push(`+${Economy.fmt(w.launderRate)}/s launder`);
 
-      let cls = 'item-card';
-      if (isActive) cls += ' item-card--active';
-      if (!unlocked) cls += ' item-card--locked';
-      if (!canAfford && !unlocked) cls += ' item-card--unaffordable';
-
-      const costLabel = unlocked
-        ? (isActive ? '✓ Active' : 'Switch')
-        : (item.unlockCash === 0 ? 'Free' : Economy.formatCash(item.unlockCash));
-
-      const tierBadge = item.tier > 1 ? `<span class="tier-badge">T${item.tier}</span>` : '';
-      const catColor  = { weed: '#4CAF50', psychedelic: '#9C27B0', party: '#FF4081', hard: '#F44336', contraband: '#FF9800' }[item.category] || '#888';
-
-      html += `<div class="item-card" data-item-id="${item.id}" style="border-left: 3px solid ${catColor}">
-        <div class="item-card__icon" style="background:${item.color}20">${item.icon}</div>
-        <div class="item-card__info">
-          <div class="item-card__name">${item.name} ${tierBadge}</div>
-          <div class="item-card__desc">${item.desc}</div>
-          <div class="item-card__stats">
-            <span class="stat-val">${Economy.formatCash(item.clickValue)}/deal</span>
-            <span class="stat-heat">🔥 ${item.heatPerClick}/click</span>
-          </div>
-        </div>
-        <div class="item-card__cost ${isActive ? 'active' : ''}">${costLabel}</div>
-      </div>`;
+      html += `<button class="worker-card${canAfford ? '' : ' faded'}" data-action="hire" data-id="${w.id}"${canAfford ? '' : ' disabled'}>
+        <span class="card-icon">${w.emoji}</span>
+        <span class="card-body">
+          <span class="card-name">${w.name}<span class="card-count">[${count}]</span></span>
+          <span class="card-desc">${effects.join(' · ')}</span>
+        </span>
+        <span class="card-cost${canAfford ? ' can-afford' : ''}">${Economy.fmt(cost)}</span>
+      </button>`;
     }
     return html;
   }
 
-  function renderUpgrades(state) {
+  function _buildUpgrades(state) {
     let html = '<div class="section-title">Upgrades</div>';
+    let anyVisible = false;
 
-    for (const upg of GAME_DATA.upgrades) {
-      const bought    = !!state.upgrades[upg.id];
+    for (const upg of UPGRADES) {
+      const bought = !!state.upgrades[upg.id];
+      const meetsReq = _upgradeReqMet(state, upg);
       const canAfford = (state.cash + state.cleanCash) >= upg.cost;
-      const meetsReq  = bought || checkUpgradeReq(state, upg);
+      if (!bought && !meetsReq) continue;
+      anyVisible = true;
 
-      if (!meetsReq && !canAfford) continue;
-
-      let cls = 'upgrade-card';
-      if (bought)    cls += ' upgrade-card--bought';
-      if (!canAfford && !bought) cls += ' upgrade-card--unaffordable';
-
-      html += `<div class="${cls}" data-upgrade-id="${upg.id}">
-        <div class="upgrade-card__icon">${upg.icon}</div>
-        <div class="upgrade-card__info">
-          <div class="upgrade-card__name">${upg.name}</div>
-          <div class="upgrade-card__desc">${upg.desc}</div>
-        </div>
-        <div class="upgrade-card__cost">${bought ? '✓' : Economy.formatCash(upg.cost)}</div>
-      </div>`;
+      if (bought) {
+        html += `<div class="upgrade-card upgrade-card--bought">
+          <span class="card-icon">${upg.emoji}</span>
+          <span class="card-body">
+            <span class="card-name">${upg.name}</span>
+            <span class="card-desc">${upg.desc}</span>
+          </span>
+          <span class="card-cost owned">✓</span>
+        </div>`;
+      } else {
+        html += `<button class="upgrade-card${canAfford ? '' : ' faded'}" data-action="upgrade" data-id="${upg.id}"${canAfford ? '' : ' disabled'}>
+          <span class="card-icon">${upg.emoji}</span>
+          <span class="card-body">
+            <span class="card-name">${upg.name}</span>
+            <span class="card-desc">${upg.desc}</span>
+          </span>
+          <span class="card-cost${canAfford ? ' can-afford' : ''}">${Economy.fmt(upg.cost)}</span>
+        </button>`;
+      }
     }
+
+    if (!anyVisible) html += '<div class="empty-hint">Earn more to unlock upgrades.</div>';
     return html;
   }
 
-  function checkUpgradeReq(state, upg) {
+  function _upgradeReqMet(state, upg) {
     const req = upg.req;
     if (!req) return true;
-    if (req.cash && state.totalEarned < req.cash) return false;
+    if (req.totalEarned && state.totalEarned < req.totalEarned * 0.5) return false;
     if (req.workers) {
       for (const [wId, needed] of Object.entries(req.workers)) {
-        if ((state.workers[wId] || 0) < needed) return false;
+        if ((state.workers[wId] || 0) < Math.ceil(needed * 0.5)) return false;
       }
     }
     return true;
   }
 
-  function renderAchievements(state) {
-    let html = '<div class="section-title">Achievements (' + Achievements.getEarnedCount(state) + '/' + GAME_DATA.achievements.length + ')</div>';
-
-    for (const ach of GAME_DATA.achievements) {
-      const earned = !!state.achievements[ach.id];
-      let cls = 'ach-card';
-      if (earned) cls += ' ach-card--earned';
-
-      const rewardStr = Object.entries(ach.reward)
-        .map(([k, v]) => k === 'cash' ? '+' + Economy.formatCash(v) : '+' + v + 'x ' + k)
-        .join(', ');
-
-      html += `<div class="${cls}">
-        <div class="ach-card__icon ${earned ? '' : 'ach-locked'}">${earned ? ach.icon : '🔒'}</div>
-        <div class="ach-card__info">
-          <div class="ach-card__name">${ach.name}</div>
-          <div class="ach-card__desc">${ach.desc}</div>
-          ${rewardStr ? `<div class="ach-card__reward">Reward: ${rewardStr}</div>` : ''}
-        </div>
-      </div>`;
-    }
-    return html;
-  }
-
-  /* ── Right panel tabs ── */
-  function renderRightPanel(state) {
-    const panel = document.getElementById('right-panel-content');
-    if (!panel) return;
-
-    if (_activeRTab === 'workers') {
-      panel.innerHTML = renderWorkers(state);
-      panel.querySelectorAll('[data-worker-id]').forEach(el => {
-        el.addEventListener('click', () => Game.hireWorker(el.dataset.workerId));
-      });
-    } else if (_activeRTab === 'districts') {
-      panel.innerHTML = renderDistricts(state);
-      panel.querySelectorAll('[data-district-id]').forEach(el => {
-        el.addEventListener('click', () => Game.unlockDistrict(el.dataset.districtId));
-      });
-    } else if (_activeRTab === 'fronts') {
-      panel.innerHTML = renderFronts(state);
-      panel.querySelectorAll('[data-front-id]').forEach(el => {
-        el.addEventListener('click', () => Game.buyFront(el.dataset.frontId));
-      });
-    } else if (_activeRTab === 'stats') {
-      panel.innerHTML = renderStats(state);
-    }
-  }
-
-  function renderWorkers(state) {
-    let html = '<div class="section-title">Workers</div>';
-    const totalWorkers = Workers.getTotalWorkers(state);
-    html += `<div class="worker-total">Total crew: ${totalWorkers}</div>`;
-
-    for (const w of GAME_DATA.workers) {
-      const count    = state.workers[w.id] || 0;
-      const cost     = Economy.getWorkerCost(w.id, count);
-      const canAfford = (state.cash + state.cleanCash) >= cost;
-
-      // Only show if affordable within 10× current cash or already owned
-      if (cost > (state.cash + state.cleanCash) * 10 && count === 0 && state.totalEarned < cost * 0.1) continue;
-
-      const incomeStr  = w.incomePerSec > 0 ? Economy.formatCash(w.incomePerSec * count) + '/s' : '';
-      const heatStr    = w.heatReduce > 0   ? '-' + (w.heatReduce * count).toFixed(1) + ' heat/s' : '';
-      const laundStr   = w.launderRate > 0  ? '+' + Economy.formatCash(w.launderRate * count) + '/s clean' : '';
-      const effects    = [incomeStr, heatStr, laundStr].filter(Boolean).join(' · ');
-
-      const catColors  = { street: '#4CAF50', production: '#9C27B0', logistics: '#FF9800', finance: '#2196F3', security: '#F44336', elite: '#FFD700' };
-      const catColor   = catColors[w.category] || '#888';
-
-      html += `<div class="worker-card ${canAfford ? '' : 'worker-card--unaffordable'}" data-worker-id="${w.id}" style="border-left:3px solid ${catColor}">
-        <div class="worker-card__icon">${w.icon}</div>
-        <div class="worker-card__info">
-          <div class="worker-card__name">${w.name} <span class="worker-count">[${count}]</span></div>
-          <div class="worker-card__desc">${w.desc}</div>
-          ${effects ? `<div class="worker-card__effects">${effects}</div>` : ''}
-        </div>
-        <div class="worker-card__cost ${canAfford ? 'can-afford' : ''}">${Economy.formatCash(cost)}</div>
-      </div>`;
-    }
-    return html;
-  }
-
-  function renderDistricts(state) {
-    let html = '<div class="section-title">Territories</div>';
-
-    for (const d of GAME_DATA.districts) {
-      const owned     = !!state.districts[d.id];
-      const available = Map.isAvailable(state, d);
-      const canAfford = (state.cash + state.cleanCash) >= d.unlockCash || d.unlockCash === 0;
-
-      let cls = 'district-card';
-      if (owned)     cls += ' district-card--owned';
-      if (!available) cls += ' district-card--locked';
-
-      const bonusLabel = getBonusLabel(d.bonus);
-      const costLabel  = owned ? '✓ Claimed' : (d.unlockCash === 0 ? 'Starting Area' : Economy.formatCash(d.unlockCash));
-
-      html += `<div class="${cls}" data-district-id="${d.id}" style="border-color:${d.color}">
-        <div class="district-card__icon" style="background:${d.color}30">${d.icon}</div>
-        <div class="district-card__info">
-          <div class="district-card__name">${d.name}</div>
-          <div class="district-card__desc">${d.desc}</div>
-          <div class="district-card__bonus">${bonusLabel}</div>
-          <div class="district-card__flavor">${d.flavor}</div>
-        </div>
-        <div class="district-card__cost ${owned ? 'owned' : (canAfford ? 'can-afford' : '')}">${costLabel}</div>
-      </div>`;
-    }
-    return html;
-  }
-
-  function getBonusLabel(bonus) {
-    if (!bonus || bonus.type === 'none') return 'Starting territory';
-    const labels = {
-      clickMult:    `+${Math.round((bonus.value - 1) * 100)}% deal value`,
-      workerIncome: `+${Math.round((bonus.value - 1) * 100)}% worker income`,
-      smuggler:     `+${Math.round((bonus.value - 1) * 100)}% smuggler income`,
-      allIncome:    `+${Math.round((bonus.value - 1) * 100)}% all income`,
-      heatReduce:   `-${Math.round((1 - bonus.value) * 100)}% heat`
-    };
-    return labels[bonus.type] || bonus.type;
-  }
-
-  function renderFronts(state) {
-    let html = '<div class="section-title">Laundering Fronts</div>';
-    const totalRate = Economy.getLaunderRate(state);
-    html += `<div class="launder-rate-header">Current rate: ${Economy.formatCash(totalRate)}/s (${Math.round((state.launderEfficiency || 0.8) * 100)}% efficiency)</div>`;
-    html += `<div class="launder-queue">Dirty cash: ${Economy.formatCash(state.cash)} → Laundering...</div>`;
-
-    for (const f of GAME_DATA.fronts) {
-      const count    = state.fronts[f.id] || 0;
-      const cost     = Laundering.getFrontCost(state, f.id);
-      const canAfford = (state.cash + state.cleanCash) >= cost;
-      const totalIncome = f.launderPerSec * count;
-
-      // Show if can eventually afford or already own
-      if (cost > (state.cash + state.cleanCash) * 20 && count === 0) continue;
-
-      html += `<div class="front-card ${canAfford ? '' : 'front-card--unaffordable'}" data-front-id="${f.id}" style="border-left:3px solid ${f.color}">
-        <div class="front-card__icon" style="background:${f.color}20">${f.icon}</div>
-        <div class="front-card__info">
-          <div class="front-card__name">${f.name} <span class="front-count">[${count}]</span></div>
-          <div class="front-card__desc">${f.desc}</div>
-          <div class="front-card__rate">${Economy.formatCash(f.launderPerSec)}/s each${count > 0 ? ' · Total: ' + Economy.formatCash(totalIncome) + '/s' : ''}</div>
-        </div>
-        <div class="front-card__cost ${canAfford ? 'can-afford' : ''}">${Economy.formatCash(cost)}</div>
-      </div>`;
-    }
-    return html;
-  }
-
-  function renderStats(state) {
-    const wIncome = Economy.getWorkerIncome(state);
-    const clickVal = Economy.getClickValue(state);
-    const heatRed = Economy.getHeatReduction(state);
+  function _buildFronts(state) {
     const laundRate = Economy.getLaunderRate(state);
+    const eff = Math.round((state.launderEfficiency || 0.80) * 100);
+    let html = `<div class="section-title">Laundering Fronts</div>
+    <div class="launder-summary">
+      <span>💧 Rate: ${Economy.fmt(laundRate)}/s</span>
+      <span>✂️ Keep: ${eff}%</span>
+    </div>`;
 
+    for (const f of FRONTS) {
+      const count    = state.fronts[f.id] || 0;
+      const cost     = Laundering.frontCost(state, f.id);
+      const canAfford = (state.cash + state.cleanCash) >= cost;
+      const visible  = canAfford || count > 0 || state.totalEarned >= cost * 0.15;
+      if (!visible) continue;
+
+      html += `<button class="front-card${canAfford ? '' : ' faded'}" data-action="front" data-id="${f.id}"${canAfford ? '' : ' disabled'}>
+        <span class="card-icon">${f.emoji}</span>
+        <span class="card-body">
+          <span class="card-name">${f.name}<span class="card-count">[${count}]</span></span>
+          <span class="card-desc">${Economy.fmt(f.rate)}/s each${count > 0 ? ' · '+Economy.fmt(f.rate*count)+'/s total' : ''}</span>
+        </span>
+        <span class="card-cost${canAfford ? ' can-afford' : ''}">${Economy.fmt(cost)}</span>
+      </button>`;
+    }
+    return html;
+  }
+
+  function _buildTerritories(state) {
+    let html = `<div class="section-title">Territories <span class="section-count">${Map.count(state)}/${TERRITORIES.length}</span></div>`;
+
+    for (const t of TERRITORIES) {
+      const owned = !!state.territories[t.id];
+      const canUnlock = state.totalEarned >= t.unlockCost;
+      const claimFee  = Math.floor(t.unlockCost * 0.1);
+      const canAfford = owned || claimFee === 0 || (state.cash + state.cleanCash) >= claimFee;
+
+      const bonusLines = Object.entries(t.bonus)
+        .filter(([,v]) => v !== 1)
+        .map(([k,v]) => {
+          const pct = v > 1 ? `+${Math.round((v-1)*100)}%` : `-${Math.round((1-v)*100)}%`;
+          const labels = { sellPrice:'sell price', produceSpeed:'produce speed', sellRate:'auto-sell rate', heatMult:'heat gen' };
+          return pct + ' ' + (labels[k] || k);
+        }).join(', ');
+
+      html += `<button class="territory-card${owned ? ' owned' : canUnlock && canAfford ? '' : ' faded'}"
+          data-action="territory" data-id="${t.id}"${owned || !canUnlock ? ' disabled' : ''}>
+        <span class="card-icon">${t.emoji}</span>
+        <span class="card-body">
+          <span class="card-name">${t.name}</span>
+          <span class="card-desc">${bonusLines || 'Starting territory'}</span>
+          ${!owned && t.unlockCost > 0 ? `<span class="card-req">Req: ${Economy.fmt(t.unlockCost)} earned</span>` : ''}
+        </span>
+        <span class="card-cost${owned ? ' owned' : canUnlock && canAfford ? ' can-afford' : ''}">
+          ${owned ? '✓ Owned' : canUnlock ? Economy.fmt(claimFee)+' claim' : Economy.fmt(t.unlockCost)+' needed'}
+        </span>
+      </button>`;
+    }
+    return html;
+  }
+
+  function _buildStats(state) {
+    const sellRate = Economy.getAutoSellRate(state);
+    const sellPrice = Economy.getSellPrice(state, state.activeProduct);
     return `<div class="section-title">Statistics</div>
     <div class="stats-grid">
-      <div class="stat-row"><span class="stat-label">Total Clicks</span><span class="stat-val">${(state.stats.totalClicks||0).toLocaleString()}</span></div>
-      <div class="stat-row"><span class="stat-label">Total Earned</span><span class="stat-val">${Economy.formatCash(state.totalEarned)}</span></div>
-      <div class="stat-row"><span class="stat-label">Total Laundered</span><span class="stat-val">${Economy.formatCash(state.totalLaundered||0)}</span></div>
-      <div class="stat-row"><span class="stat-label">Click Value</span><span class="stat-val">${Economy.formatCash(clickVal)}</span></div>
-      <div class="stat-row"><span class="stat-label">Worker Income</span><span class="stat-val">${Economy.formatCash(wIncome)}/s</span></div>
-      <div class="stat-row"><span class="stat-label">Launder Rate</span><span class="stat-val">${Economy.formatCash(laundRate)}/s</span></div>
-      <div class="stat-row"><span class="stat-label">Heat Reduction</span><span class="stat-val">${heatRed.toFixed(1)}/s</span></div>
-      <div class="stat-row"><span class="stat-label">Click Multiplier</span><span class="stat-val">${(state.clickMultiplier||1).toFixed(1)}×</span></div>
-      <div class="stat-row"><span class="stat-label">Workers Hired</span><span class="stat-val">${state.stats.totalWorkersHired||0}</span></div>
-      <div class="stat-row"><span class="stat-label">Raids Survived</span><span class="stat-val">${state.stats.raidssurvived||0}</span></div>
+      <div class="stat-row"><span class="stat-label">Total Sales</span><span class="stat-val">${(state.stats.totalSales||0).toLocaleString()}</span></div>
+      <div class="stat-row"><span class="stat-label">Total Earned</span><span class="stat-val">${Economy.fmt(state.totalEarned)}</span></div>
+      <div class="stat-row"><span class="stat-label">Total Laundered</span><span class="stat-val">${Economy.fmt(state.totalLaundered||0)}</span></div>
+      <div class="stat-row"><span class="stat-label">Units Produced</span><span class="stat-val">${(state.stats.totalProduced||0).toLocaleString()}</span></div>
+      <div class="stat-row"><span class="stat-label">Auto-Sell Rate</span><span class="stat-val">${sellRate.toFixed(2)}/s</span></div>
+      <div class="stat-row"><span class="stat-label">Income Rate</span><span class="stat-val">${Economy.fmt(sellRate*sellPrice)}/s</span></div>
+      <div class="stat-row"><span class="stat-label">Launder Rate</span><span class="stat-val">${Economy.fmt(Economy.getLaunderRate(state))}/s</span></div>
+      <div class="stat-row"><span class="stat-label">Heat Reduction</span><span class="stat-val">${Economy.getHeatReduction(state).toFixed(1)}/s</span></div>
+      <div class="stat-row"><span class="stat-label">Workers</span><span class="stat-val">${Workers.total(state)}</span></div>
+      <div class="stat-row"><span class="stat-label">Raids Survived</span><span class="stat-val">${state.stats.raidsSurvived||0}</span></div>
       <div class="stat-row"><span class="stat-label">Events Triggered</span><span class="stat-val">${state.stats.totalEvents||0}</span></div>
-      <div class="stat-row"><span class="stat-label">Max Heat</span><span class="stat-val">${(state.stats.maxHeat||0).toFixed(1)}</span></div>
-      <div class="stat-row"><span class="stat-label">Play Time</span><span class="stat-val">${Economy.formatTime(state.totalPlayTime||0)}</span></div>
-      <div class="stat-row"><span class="stat-label">Achievements</span><span class="stat-val">${Achievements.getEarnedCount(state)}/${GAME_DATA.achievements.length}</span></div>
+      <div class="stat-row"><span class="stat-label">Achievements</span><span class="stat-val">${Achievements.earnedCount(state)}/${ACHIEVEMENTS.length}</span></div>
+      <div class="stat-row"><span class="stat-label">Play Time</span><span class="stat-val">${Economy.fmtTime(state.totalPlayTime||0)}</span></div>
     </div>`;
   }
 
-  /* ── Heat bar ── */
-  function renderHeatBar(state) {
-    const bar = document.getElementById('heat-fill');
-    const label = document.getElementById('heat-label');
-    const heatPct = state.heat;
+  function _buildAchievements(state) {
+    const earned = Achievements.earnedCount(state);
+    let html = `<div class="section-title">Achievements <span class="section-count">${earned}/${ACHIEVEMENTS.length}</span></div>`;
 
-    if (bar) {
-      bar.style.width = heatPct + '%';
-      bar.className = 'heat-fill heat-fill--' + (
-        heatPct < 25 ? 'safe' :
-        heatPct < 50 ? 'warm' :
-        heatPct < 75 ? 'hot'  :
-        heatPct < 90 ? 'danger' : 'raid'
+    for (const a of ACHIEVEMENTS) {
+      const got = !!state.achievements[a.id];
+      const rewardStr = Object.entries(a.reward)
+        .map(([k,v]) => k === 'cash' ? '+'+Economy.fmt(v) : k === 'sellPrice' ? `×${v} sell price` : k === 'produceSpeed' ? `×${v} produce` : k === 'heatMult' ? `-${Math.round((1-v)*100)}% heat` : k === 'launderRate' ? `×${v} launder` : '')
+        .filter(Boolean).join(', ');
+
+      html += `<div class="ach-card${got ? ' ach-card--earned' : ''}">
+        <span class="ach-icon">${got ? a.icon : '🔒'}</span>
+        <span class="card-body">
+          <span class="card-name">${a.name}</span>
+          <span class="card-desc">${got ? a.desc : '???'}</span>
+          ${rewardStr ? `<span class="card-req">Reward: ${rewardStr}</span>` : ''}
+        </span>
+      </div>`;
+    }
+    return html;
+  }
+
+  /* ── Heat panel ── */
+  function _renderHeat(state) {
+    const h = state.heat;
+    const fill = document.getElementById('heat-bar-fill');
+    if (fill) {
+      fill.style.width = h.toFixed(1) + '%';
+      fill.className = 'heat-bar-fill ' + (
+        h < 25 ? 'heat-cool' : h < 50 ? 'heat-warm' : h < 75 ? 'heat-hot' : h < 90 ? 'heat-danger' : 'heat-raid'
       );
     }
+    _t('heat-pct', h.toFixed(0) + '%');
+    const stages = ['😎 Safe','👀 Suspicious','🚨 Investigated','🔴 Surveillance','💀 RAID RISK'];
+    const stage  = h < 25 ? 0 : h < 50 ? 1 : h < 75 ? 2 : h < 90 ? 3 : 4;
+    _t('heat-stage', stages[stage]);
+  }
 
-    if (label) {
-      const stages = ['Safe', 'Suspicious', 'Investigated', 'Surveillance', 'RAID RISK'];
-      const stage  = heatPct < 25 ? 0 : heatPct < 50 ? 1 : heatPct < 75 ? 2 : heatPct < 90 ? 3 : 4;
-      label.textContent = `Heat: ${heatPct.toFixed(0)}% — ${stages[stage]}`;
+  /* ── Event choice ── */
+  function _renderEventChoice(state) {
+    const box = document.getElementById('event-choice-box');
+    if (!box) return;
+    if (Events.hasChoice()) {
+      const ev = Events.getChoice();
+      box.classList.remove('hidden');
+      _t('choice-desc', ev ? ev.desc : '');
+      _t('choice-cost', ev?.effect?.bribe ? `Pay ${Economy.fmt(ev.effect.bribe)}` : 'Accept');
+    } else {
+      box.classList.add('hidden');
     }
   }
 
-  /* ── Action buttons ── */
-  function renderActionButtons(state) {
-    const llCd = state.layLowCooldown > 0;
-    const brCd = state.bribeCooldown  > 0;
+  /* ══════════ EFFECTS ══════════ */
 
-    const llText = llCd ? `Lay Low (${Math.ceil(state.layLowCooldown)}s)` : '🕶️ Lay Low (-20 heat, $500)';
-    const brText = brCd ? `Bribe (${Math.ceil(state.bribeCooldown)}s)`    : '💰 Bribe (-35 heat, $2k)';
-    const llSmall = llCd ? `Lay Low (${Math.ceil(state.layLowCooldown)}s)` : '🕶️ Lay Low';
-    const brSmall = brCd ? `Bribe (${Math.ceil(state.bribeCooldown)}s)`    : '💰 Bribe';
-
-    const llBtn = document.getElementById('lay-low-btn');
-    const brBtn = document.getElementById('bribe-btn');
-    if (llBtn) { llBtn.disabled = llCd; llBtn.textContent = llText; }
-    if (brBtn) { brBtn.disabled = brCd; brBtn.textContent = brText; }
-
-    const llBtn2 = document.getElementById('lay-low-btn-2');
-    const brBtn2 = document.getElementById('bribe-btn-2');
-    if (llBtn2) { llBtn2.disabled = llCd; llBtn2.textContent = llSmall; }
-    if (brBtn2) { brBtn2.disabled = brCd; brBtn2.textContent = brSmall; }
+  function produceEffect(qty) {
+    const bar = document.getElementById('produce-bar-fill');
+    if (bar) {
+      bar.classList.remove('bar-pulse');
+      void bar.offsetWidth;
+      bar.classList.add('bar-pulse');
+    }
+    _floatText(document.getElementById('produce-btn'), '+' + qty + ' batch', 'float-produce');
   }
 
-  /* ── Notifications ── */
-  function addNotification(msg, type = 'info', extra = null) {
-    const log = document.getElementById('notification-log');
+  function sellEffect(fmtAmt) {
+    _floatText(document.getElementById('sell-all-btn') || document.getElementById('sell-one-btn'), '+' + fmtAmt, 'float-cash');
+  }
+
+  function raidFlash() {
+    document.body.classList.add('raid-flash');
+    setTimeout(() => document.body.classList.remove('raid-flash'), 900);
+  }
+
+  function _floatText(anchor, text, cls) {
+    if (!anchor) return;
+    const state = Game.getState();
+    if (state.settings?.floatText === false) return;
+    const rect = anchor.getBoundingClientRect();
+    const el = document.createElement('div');
+    el.className = cls || 'float-cash';
+    el.textContent = text;
+    el.style.left = rect.left + rect.width / 2 + 'px';
+    el.style.top  = rect.top + 'px';
+    el.id = 'ft' + (_floatId++);
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 900);
+  }
+
+  /* ══════════ NOTIFICATIONS ══════════ */
+
+  function addNotif(msg, type = 'info', extra = null) {
+    const log = document.getElementById('notif-log');
     if (!log) return;
 
     const el = document.createElement('div');
     el.className = 'notif notif--' + type;
-
-    const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-    if (type === 'event' && extra && extra.type === 'choice') {
-      el.innerHTML = `<span class="notif-time">${ts}</span>
-        <span class="notif-msg">${msg}</span>
-        <div class="notif-choices">
-          <button class="btn btn--sm btn--success" onclick="Game.resolveEventChoice(true)">Accept (Pay $${extra.effect.value.toLocaleString()})</button>
-          <button class="btn btn--sm btn--danger"  onclick="Game.resolveEventChoice(false)">Refuse (+25 heat)</button>
-        </div>`;
-    } else {
-      el.innerHTML = `<span class="notif-time">${ts}</span><span class="notif-msg">${msg}</span>`;
-    }
-
+    const ts = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    el.innerHTML = `<span class="notif-time">${ts}</span><span class="notif-msg">${msg}</span>`;
     log.prepend(el);
+    while (log.children.length > 50) log.removeChild(log.lastChild);
 
-    // Keep log trimmed
-    while (log.children.length > 40) log.removeChild(log.lastChild);
-
-    // Achievement popup
-    if (type === 'achievement') showAchievementPopup(msg);
+    if (type === 'achievement') _achievementPopup(msg);
+    if (type === 'raid') raidFlash();
   }
 
-  function showAchievementPopup(msg) {
+  function _achievementPopup(msg) {
     const el = document.createElement('div');
     el.className = 'ach-popup';
     el.textContent = msg;
     document.body.appendChild(el);
-    setTimeout(() => el.classList.add('ach-popup--visible'), 10);
+    requestAnimationFrame(() => el.classList.add('ach-popup--show'));
     setTimeout(() => {
-      el.classList.remove('ach-popup--visible');
-      setTimeout(() => el.remove(), 500);
-    }, 3000);
+      el.classList.remove('ach-popup--show');
+      setTimeout(() => el.remove(), 400);
+    }, 3200);
   }
 
-  /* ── Effects ── */
-  function triggerClickEffect(amount) {
-    const btn = document.getElementById('deal-btn');
-    if (!btn) return;
+  /* ══════════ MODALS ══════════ */
 
-    // Ripple
-    btn.classList.add('deal-btn--clicked');
-    setTimeout(() => btn.classList.remove('deal-btn--clicked'), 150);
-
-    // Floating text
-    if (Game.getState().settings.showFloatingText !== false) {
-      const rect = btn.getBoundingClientRect();
-      const el = document.createElement('div');
-      el.className = 'float-cash';
-      el.textContent = '+' + Economy.formatCash(amount);
-      el.style.left = (rect.left + rect.width / 2) + 'px';
-      el.style.top  = (rect.top) + 'px';
-      el.id = 'fc' + (_floatId++);
-      document.body.appendChild(el);
-      setTimeout(() => el.remove(), 1000);
-    }
-  }
-
-  function triggerRaidEffect() {
-    document.body.classList.add('raid-flash');
-    setTimeout(() => document.body.classList.remove('raid-flash'), 1000);
-  }
-
-  /* ── Content warning modal ── */
-  function showContentWarning() {
-    const modal = document.getElementById('content-warning-modal');
-    if (modal) modal.classList.remove('hidden');
-
+  function showWarning() {
+    const m = document.getElementById('content-warning-modal');
+    if (!m) return;
+    m.classList.remove('hidden');
     document.getElementById('cw-continue')?.addEventListener('click', () => {
-      modal.classList.add('hidden');
+      m.classList.add('hidden');
       localStorage.setItem('dds3_warned', '1');
     });
-    document.getElementById('cw-learn-more')?.addEventListener('click', () => {
+    document.getElementById('cw-more')?.addEventListener('click', () => {
       document.getElementById('cw-extra')?.classList.toggle('hidden');
     });
   }
 
-  /* ── Settings modal render ── */
-  function renderSettingsModal(state) {
-    const s = state.settings;
-    setVal('setting-graphics',    s.graphics    || 'balanced');
-    setVal('setting-anim',        s.animationIntensity || 'medium');
-    setVal('setting-float-text',  s.showFloatingText !== false);
-    setVal('setting-notifs',      s.notifications !== false);
-  }
-
-  /* ── Admin panel ── */
-  function setupAdminAccess() {
-    // Konami code: Up Up Down Down Left Right Left Right B A
-    const konami = [38,38,40,40,37,39,37,39,66,65];
-    let kIdx = 0;
-    document.addEventListener('keydown', e => {
-      if (e.keyCode === konami[kIdx]) {
-        kIdx++;
-        if (kIdx === konami.length) {
-          kIdx = 0;
-          toggleModal('admin-modal');
-        }
-      } else {
-        kIdx = 0;
-      }
-    });
-
-    // Admin actions
-    document.getElementById('admin-add-1k')?.addEventListener('click',    () => { Game.adminAddCash(1000); });
-    document.getElementById('admin-add-1m')?.addEventListener('click',    () => { Game.adminAddCash(1000000); });
-    document.getElementById('admin-add-1b')?.addEventListener('click',    () => { Game.adminAddCash(1000000000); });
-    document.getElementById('admin-zero-heat')?.addEventListener('click', () => { Game.adminSetHeat(0); });
-    document.getElementById('admin-max-heat')?.addEventListener('click',  () => { Game.adminSetHeat(100); });
-    document.getElementById('admin-unlock-all')?.addEventListener('click',() => { Game.adminUnlockAll(); });
-    document.getElementById('admin-reset')?.addEventListener('click',     () => { Game.resetGame(); });
-  }
-
   function toggleModal(id) {
-    const m = document.getElementById(id);
-    if (m) m.classList.toggle('hidden');
+    document.getElementById(id)?.classList.toggle('hidden');
   }
 
   /* ── Helpers ── */
-  function setText(id, text) {
+  function _t(id, text) {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
   }
-  function setVal(id, val) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (el.type === 'checkbox') el.checked = !!val;
-    else el.value = val;
-  }
 
   return {
-    init, render,
-    addNotification, showAchievementPopup,
-    triggerClickEffect, triggerRaidEffect,
-    showContentWarning, renderSettingsModal,
-    toggleModal
+    init, render, addNotif,
+    produceEffect, sellEffect, raidFlash,
+    showWarning, toggleModal
   };
-
 })();

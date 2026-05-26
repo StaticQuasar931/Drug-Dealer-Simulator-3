@@ -1,46 +1,28 @@
-/* Map - District / Territory management */
+'use strict';
+/* ── Territories ── */
 const Map = (() => {
 
-  function unlockDistrict(state, districtId) {
-    if (state.districts[districtId]) return { success: false, reason: 'Already unlocked' };
-    const def = GAME_DATA.districts.find(d => d.id === districtId);
-    if (!def) return { success: false, reason: 'Unknown district' };
-
-    if (state.totalEarned < def.unlockCash) {
-      return { success: false, reason: `Need ${Economy.formatCash(def.unlockCash)} total earned` };
-    }
-
-    const cost = def.unlockCash;
-    const totalCash = state.cash + state.cleanCash;
-    if (totalCash < cost && cost > 0) {
-      return { success: false, reason: `Need ${Economy.formatCash(cost)} cash to claim` };
-    }
-
-    if (cost > 0) {
-      if (state.cash >= cost) {
-        state.cash -= cost;
-      } else {
-        const rem = cost - state.cash;
-        state.cash = 0;
-        state.cleanCash = Math.max(0, state.cleanCash - rem);
-      }
-    }
-
-    state.districts[districtId] = true;
-    state.stats.districtsUnlocked = (state.stats.districtsUnlocked || 0) + 1;
-
-    return { success: true, name: def.name, bonus: def.bonus };
+  function unlock(state, territoryId) {
+    if (state.territories[territoryId]) return { ok:false, reason:'Already owned' };
+    const t = TERRITORIES.find(x => x.id === territoryId);
+    if (!t) return { ok:false, reason:'Unknown territory' };
+    if (state.totalEarned < t.unlockCost) return { ok:false, reason:`Need ${Economy.fmt(t.unlockCost)} total earned` };
+    const cost = Math.floor(t.unlockCost * 0.1); // pay 10% of threshold as a claim fee
+    if (cost > 0 && (state.cash + state.cleanCash) < cost) return { ok:false, reason:`Need ${Economy.fmt(cost)} to claim` };
+    if (cost > 0) Production.deductCash(state, cost);
+    state.territories[territoryId] = true;
+    state.stats.territoriesUnlocked = (state.stats.territoriesUnlocked||0) + 1;
+    return { ok:true, name:t.name };
   }
 
-  function getUnlockedCount(state) {
-    return Object.values(state.districts).filter(Boolean).length;
+  function count(state) {
+    return Object.values(state.territories).filter(Boolean).length;
   }
 
-  function isAvailable(state, districtId) {
-    const def = GAME_DATA.districts.find(d => d.id === districtId);
-    if (!def) return false;
-    return state.totalEarned >= def.unlockCash;
+  function canUnlock(state, territoryId) {
+    const t = TERRITORIES.find(x => x.id === territoryId);
+    return t && state.totalEarned >= t.unlockCost;
   }
 
-  return { unlockDistrict, getUnlockedCount, isAvailable };
+  return { unlock, count, canUnlock };
 })();

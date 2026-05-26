@@ -1,146 +1,97 @@
-/* Events - Random event system */
+'use strict';
+/* ── Events ── */
 const Events = (() => {
 
-  const EVENT_CHANCE_PER_MINUTE = 0.15; // 15% chance each minute
-  let _timeSinceLastEvent = 0;
-  let _activeEvents = [];
-  let _pendingChoice = null;
+  const EVENT_RATE = 1 / 90; // ~1 event per 90 seconds
+  let _timer  = 0;
+  let _active = []; // { ...event, remaining }
+  let _choice = null;
 
-  function tick(state, deltaSeconds, notifyFn) {
-    // Advance active event timers
-    _activeEvents = _activeEvents.filter(ev => {
-      ev.remaining -= deltaSeconds;
+  function tick(state, dt, notify) {
+    // Advance active timed events
+    _active = _active.filter(ev => {
+      ev.remaining -= dt;
       if (ev.remaining <= 0) {
-        // Remove effect
-        removeEventEffect(state, ev);
-        notifyFn('Event ended: ' + ev.name, 'info');
+        _removeMod(state, ev);
+        notify(`${ev.icon} ${ev.name} ended.`, 'info');
         return false;
       }
       return true;
     });
 
-    // Also tick temporary click mult
-    if (state.tempClickMult && state.tempClickMultExpiry) {
-      if (Date.now() > state.tempClickMultExpiry) {
-        state.clickMultiplier /= state.tempClickMult;
-        state.tempClickMult = null;
-        state.tempClickMultExpiry = null;
-      }
-    }
-
-    _timeSinceLastEvent += deltaSeconds;
-    // Check every 60s for a new event
-    if (_timeSinceLastEvent >= 60) {
-      _timeSinceLastEvent = 0;
-      if (Math.random() < EVENT_CHANCE_PER_MINUTE) {
-        triggerRandomEvent(state, notifyFn);
-      }
+    // Try to fire a new event
+    _timer += dt;
+    if (_timer >= (1 / EVENT_RATE)) {
+      _timer = 0;
+      if (Math.random() < 0.75) _fire(state, notify); // 75% chance when timer fires
     }
   }
 
-  function triggerRandomEvent(state, notifyFn) {
-    const pool = GAME_DATA.events;
-    const totalWeight = pool.reduce((s, e) => s + e.weight, 0);
-    let rand = Math.random() * totalWeight;
-    let chosen = null;
-    for (const ev of pool) {
-      rand -= ev.weight;
-      if (rand <= 0) { chosen = ev; break; }
-    }
-    if (!chosen) chosen = pool[0];
-
-    applyEvent(state, chosen, notifyFn);
-    state.stats.totalEvents = (state.stats.totalEvents || 0) + 1;
+  function _fire(state, notify) {
+    const pool  = EVENTS;
+    const total = pool.reduce((s,e) => s+e.w, 0);
+    let r = Math.random() * total;
+    let ev = pool[0];
+    for (const e of pool) { r -= e.w; if (r <= 0) { ev = e; break; } }
+    _apply(state, ev, notify);
+    state.stats.totalEvents = (state.stats.totalEvents||0) + 1;
   }
 
-  function applyEvent(state, ev, notifyFn) {
+  function _apply(state, ev, notify) {
     if (ev.type === 'choice') {
-      _pendingChoice = ev;
-      notifyFn('EVENT: ' + ev.desc, 'event', ev);
+      _choice = ev;
+      notify(`🚨 EVENT: ${ev.desc}`, 'choice', ev);
       return;
     }
-
-    const effect = ev.effect;
-    switch (effect.type) {
-      case 'incomeMult':
-        state.eventMods.incomeMult = (state.eventMods.incomeMult || 1) * effect.value;
-        if (ev.duration > 0) {
-          _activeEvents.push({ ...ev, remaining: ev.duration });
-        }
-        break;
-
-      case 'heatAdd':
-        state.heat = Math.min(100, state.heat + effect.value);
-        break;
-
-      case 'cashBonus':
-        const bonus = Economy.getClickValue(state) * effect.value * 10;
-        state.cash += bonus;
-        state.totalEarned += bonus;
-        break;
-
-      case 'loseWorker':
-        const lost = Workers.loseRandomWorker(state);
-        if (lost) notifyFn('Lost worker: ' + lost, 'danger');
-        break;
-
-      case 'clickMult':
-        if (effect.temp) {
-          state.clickMultiplier *= effect.value;
-          state.tempClickMult = effect.value;
-          state.tempClickMultExpiry = Date.now() + effect.temp * 1000;
-        }
-        break;
-
-      case 'blackout':
-        state.eventMods.blackout = true;
-        if (ev.duration > 0) {
-          _activeEvents.push({ ...ev, remaining: ev.duration });
-        }
-        break;
+    const fx = ev.effect;
+    if (fx.priceMult   !== undefined) {
+      state.mods.priceMult   = (state.mods.priceMult||1) * fx.priceMult;
+      if (ev.duration > 0) _active.push({ ...ev, remaining: ev.duration });
     }
-
-    const typeClass = ev.type === 'positive' ? 'success' : ev.type === 'negative' ? 'danger' : 'info';
-    notifyFn(ev.icon + ' ' + ev.name + ': ' + ev.desc, typeClass);
+    if (fx.produceMult !== undefined) {
+      state.mods.produceMult = (state.mods.produceMult||1) * fx.produceMult;
+      if (ev.duration > 0) _active.push({ ...ev, remaining: ev.duration });
+    }
+    if (fx.heat)       state.heat = Math.min(100, state.heat + fx.heat);
+    if (fx.cashBonus)  {
+      const bonus = Economy.getSellPrice(state, state.activeProduct) * fx.cashBonus;
+      state.cash += bonus; state.totalEarned += bonus;
+    }
+    if (fx.loseWorker) {
+      const lost = Workers.loseOne(state);
+      if (lost) notify(`👮 ${lost} got arrested!`, 'danger');
+    }
+    const cls = ev.type==='good' ? 'success' : ev.type==='bad' ? 'danger' : 'info';
+    notify(`${ev.icon} ${ev.name}: ${ev.desc}`, cls);
   }
 
-  function removeEventEffect(state, ev) {
-    const effect = ev.effect;
-    switch (effect.type) {
-      case 'incomeMult':
-        state.eventMods.incomeMult = Math.max(1, (state.eventMods.incomeMult || 1) / effect.value);
-        break;
-      case 'blackout':
-        delete state.eventMods.blackout;
-        break;
-    }
+  function _removeMod(state, ev) {
+    const fx = ev.effect;
+    if (fx.priceMult   !== undefined) state.mods.priceMult   = Math.max(0.1, (state.mods.priceMult||1)/fx.priceMult);
+    if (fx.produceMult !== undefined) state.mods.produceMult = Math.max(0.1, (state.mods.produceMult||1)/fx.produceMult);
   }
 
-  function resolveChoice(state, accept, notifyFn) {
-    if (!_pendingChoice) return;
-    const ev = _pendingChoice;
-    _pendingChoice = null;
-
+  function resolveChoice(state, accept, notify) {
+    if (!_choice) return;
+    const ev = _choice; _choice = null;
     if (accept) {
-      // Pay the bribe
-      const bribeAmount = ev.effect.value;
-      if (state.cash + state.cleanCash >= bribeAmount) {
-        if (state.cash >= bribeAmount) state.cash -= bribeAmount;
-        else { state.cleanCash -= bribeAmount - state.cash; state.cash = 0; }
-        notifyFn('Paid $' + bribeAmount.toLocaleString() + ' bribe. Heat cleared.', 'success');
+      const cost = ev.effect.bribe || 0;
+      if ((state.cash + state.cleanCash) >= cost) {
+        Production.deductCash(state, cost);
+        notify(`✅ Paid ${Economy.fmt(cost)}. Heat cleared.`, 'success');
       } else {
-        notifyFn('Can\'t afford bribe! Heat rising.', 'danger');
-        state.heat = Math.min(100, state.heat + 25);
+        state.heat = Math.min(100, state.heat + 30);
+        notify(`❌ Can\'t afford! +30 heat.`, 'danger');
       }
     } else {
-      state.heat = Math.min(100, state.heat + 25);
-      notifyFn('Refused the deal. +25 heat.', 'danger');
+      state.heat = Math.min(100, state.heat + (ev.effect.bribe ? 30 : 20));
+      notify('❌ Refused. Heat rising.', 'danger');
     }
   }
 
-  function hasPendingChoice() { return !!_pendingChoice; }
-  function getPendingChoice() { return _pendingChoice; }
-  function getActiveEvents() { return _activeEvents; }
+  function getActive()  { return _active; }
+  function hasChoice()  { return !!_choice; }
+  function getChoice()  { return _choice; }
 
-  return { tick, triggerRandomEvent, applyEvent, resolveChoice, hasPendingChoice, getPendingChoice, getActiveEvents };
+  return { tick, resolveChoice, getActive, hasChoice, getChoice };
 })();

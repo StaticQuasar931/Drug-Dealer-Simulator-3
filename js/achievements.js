@@ -1,58 +1,49 @@
-/* Achievements - Checking and awarding */
+'use strict';
+/* ── Achievements ── */
 const Achievements = (() => {
 
-  function checkAll(state, notifyFn) {
-    for (const ach of GAME_DATA.achievements) {
-      if (state.achievements[ach.id]) continue;
-      if (_check(state, ach)) {
-        award(state, ach, notifyFn);
-      }
+  function check(state, notify) {
+    for (const a of ACHIEVEMENTS) {
+      if (state.achievements[a.id]) continue;
+      if (_meets(state, a.req)) _award(state, a, notify);
     }
   }
 
-  function _check(state, ach) {
-    const req = ach.req;
-    switch (req.type) {
-      case 'clicks':       return (state.stats.totalClicks || 0) >= req.value;
-      case 'totalEarned':  return state.totalEarned >= req.value;
-      case 'totalWorkers': return Workers.getTotalWorkers(state) >= req.value;
-      case 'totalLaundered': return (state.totalLaundered || 0) >= req.value;
-      case 'raidssurvived': return (state.stats.raidssurvived || 0) >= req.value;
-      case 'maxHeat':      return (state.stats.maxHeat || 0) >= req.value;
-      case 'districts':    return Map.getUnlockedCount(state) >= req.value;
-      case 'fronts':       return Laundering.getTotalFronts(state) >= req.value;
-      case 'item':         return !!state.unlockedItems[req.item];
-      case 'playTime':     return (state.totalPlayTime || 0) >= req.value;
-      case 'speedRun': {
-        const elapsed = (Date.now() - (state.startTime || Date.now())) / 1000;
-        return state.totalEarned >= req.value && elapsed <= req.time;
-      }
-      default: return false;
+  function _meets(state, req) {
+    if (req.sales        && (state.stats.totalSales||0) < req.sales)             return false;
+    if (req.totalEarned  && state.totalEarned < req.totalEarned)                  return false;
+    if (req.totalWorkers && Workers.total(state) < req.totalWorkers)              return false;
+    if (req.laundered    && (state.totalLaundered||0) < req.laundered)            return false;
+    if (req.raidsSurvived&& (state.stats.raidsSurvived||0) < req.raidsSurvived)  return false;
+    if (req.maxHeat      && (state.stats.maxHeat||0) < req.maxHeat)               return false;
+    if (req.territories  && Map.count(state) < req.territories)                   return false;
+    if (req.fronts       && Laundering.totalFronts(state) < req.fronts)           return false;
+    if (req.product      && !state.unlockedProducts[req.product])                 return false;
+    if (req.playTime     && (state.totalPlayTime||0) < req.playTime)              return false;
+    if (req.speedRun) {
+      const elapsed = (Date.now() - (state.startTime||Date.now())) / 1000;
+      if (state.totalEarned < req.speedRun.cash || elapsed > req.speedRun.time)  return false;
     }
+    return true;
   }
 
-  function award(state, ach, notifyFn) {
-    state.achievements[ach.id] = { earnedAt: Date.now() };
-    state.stats.achievementsEarned = (state.stats.achievementsEarned || 0) + 1;
+  function _award(state, ach, notify) {
+    state.achievements[ach.id] = { at: Date.now() };
+    state.stats.achEarned = (state.stats.achEarned||0) + 1;
 
-    // Apply reward
     const r = ach.reward;
-    if (r.cash)          { state.cash += r.cash; state.totalEarned += r.cash; }
-    if (r.clickMult)     { state.clickMultiplier = (state.clickMultiplier || 1) * r.clickMult; }
-    if (r.allWorkerMult) { state.allWorkerMultiplier = (state.allWorkerMultiplier || 1) * r.allWorkerMult; }
-    if (r.launderMult)   { state.launderMultiplier = (state.launderMultiplier || 1) * r.launderMult; }
-    if (r.heatMult)      { state.heatMultiplier = (state.heatMultiplier || 1) * r.heatMult; }
-    if (r.allIncomeMult) {
-      state.clickMultiplier     = (state.clickMultiplier || 1) * r.allIncomeMult;
-      state.allWorkerMultiplier = (state.allWorkerMultiplier || 1) * r.allIncomeMult;
-    }
+    if (r.cash)         { state.cash += r.cash; state.totalEarned += r.cash; }
+    if (r.sellPrice)    state.sellPriceBonus   = (state.sellPriceBonus||1) * r.sellPrice;
+    if (r.produceSpeed) state.produceSpeedMult = (state.produceSpeedMult||1) * r.produceSpeed;
+    if (r.heatMult)     state.heatMult         = (state.heatMult||1) * r.heatMult;
+    if (r.launderRate)  state.launderRateMult  = (state.launderRateMult||1) * r.launderRate;
 
-    notifyFn('🏆 Achievement: ' + ach.name, 'achievement');
+    notify(`🏆 ${ach.name}: ${ach.desc}`, 'achievement');
   }
 
-  function getEarnedCount(state) {
+  function earnedCount(state) {
     return Object.values(state.achievements).filter(Boolean).length;
   }
 
-  return { checkAll, award, getEarnedCount };
+  return { check, earnedCount };
 })();

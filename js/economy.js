@@ -1,214 +1,167 @@
-/* Economy - Price fluctuation and income calculations */
+'use strict';
+/* ── Economy — price math, multiplier helpers ── */
 const Economy = (() => {
 
-  // Price modifier oscillates sinusoidally ± 25%
-  let _priceModifier = 1.0;
-  let _priceDirection = 0.001;
-  let _pricePhase = 0;
+  /* Price oscillation */
+  let _phase = 0;
+  let _pricemod = 1;
 
-  function tickPrices(deltaSeconds) {
-    _pricePhase += deltaSeconds * 0.05; // slow cycle
-    _priceModifier = 1 + 0.25 * Math.sin(_pricePhase);
+  function tickPrices(dt) {
+    _phase += dt * 0.04;
+    _pricemod = 1 + 0.25 * Math.sin(_phase);
+  }
+  function getPriceMod() { return _pricemod; }
+
+  /* ── Compute effective sell price ── */
+  function getSellPrice(state, productId) {
+    const p = PRODUCTS.find(x => x.id === (productId || state.activeProduct));
+    if (!p) return 0;
+    let price = p.basePrice;
+    price *= _pricemod;                                    // market fluctuation
+    price *= (state.mods.priceMult || 1);                  // event modifier
+    price *= (state.sellPriceBonus || 1);                  // upgrade/achievement multiplier
+    price *= getTerritoryBonus(state, 'sellPrice');         // territory
+    price *= getHeatPenalty(state.heat);                   // heat penalty
+    return price;
   }
 
-  function getPriceModifier() {
-    return _priceModifier;
-  }
-
-  /* ── Compute current click value ── */
-  function getClickValue(state) {
-    const item = GAME_DATA.items.find(i => i.id === state.activeItem);
-    if (!item) return 0;
-
-    let base = item.clickValue;
-
-    // Upgrade multipliers
-    let clickMult = state.clickMultiplier || 1;
-
-    // Heat penalty
-    const heatPenalty = getHeatPenalty(state.heat);
-
-    // District bonuses
-    const districtMult = getDistrictClickMult(state);
-
-    // Event modifier
-    const eventMult = state.eventMods.incomeMult || 1;
-
-    // Price fluctuation
-    const priceMod = _priceModifier;
-
-    return base * clickMult * heatPenalty * districtMult * eventMult * priceMod;
-  }
-
-  /* ── Worker income per second ── */
-  function getWorkerIncome(state) {
-    let total = 0;
-
-    for (const [wId, count] of Object.entries(state.workers)) {
-      if (count <= 0) continue;
-      const workerDef = GAME_DATA.workers.find(w => w.id === wId);
-      if (!workerDef || workerDef.incomePerSec <= 0) continue;
-
-      let income = workerDef.incomePerSec * count;
-
-      // Per-worker upgrade multipliers
-      const mult = getWorkerMult(state, wId);
-      income *= mult;
-
-      // Global worker multiplier
-      income *= (state.allWorkerMultiplier || 1);
-
-      // District bonus
-      const distMult = getDistrictWorkerMult(state, wId);
-      income *= distMult;
-
-      total += income;
-    }
-
-    // Heat penalty applies to worker income too
-    total *= getHeatPenalty(state.heat);
-
-    // Event modifier
-    total *= (state.eventMods.incomeMult || 1);
-
-    return total;
-  }
-
-  /* ── Heat reduction per second from workers ── */
-  function getHeatReduction(state) {
-    let reduction = 0;
-    for (const [wId, count] of Object.entries(state.workers)) {
-      if (count <= 0) continue;
-      const workerDef = GAME_DATA.workers.find(w => w.id === wId);
-      if (workerDef && workerDef.heatReduce > 0) {
-        reduction += workerDef.heatReduce * count;
-      }
-    }
-    // Underground district: -50% heat generation (handled at generation side)
-    // But also reduces passive heat here
-    if (state.districts.underground) reduction += 1;
-    return reduction;
-  }
-
-  /* ── Laundering rate per second ── */
-  function getLaunderRate(state) {
+  /* ── Auto-produce rate (units/s) ── */
+  function getAutoProduceRate(state) {
+    const p = PRODUCTS.find(x => x.id === state.activeProduct);
+    if (!p) return 0;
     let rate = 0;
-
-    // From fronts
-    for (const [fId, count] of Object.entries(state.fronts)) {
-      if (count <= 0) continue;
-      const frontDef = GAME_DATA.fronts.find(f => f.id === fId);
-      if (frontDef) rate += frontDef.launderPerSec * count;
+    for (const [wId, cnt] of Object.entries(state.workers)) {
+      if (!cnt) continue;
+      const w = WORKERS.find(x => x.id === wId);
+      if (w && w.produceRate > 0) rate += w.produceRate * cnt;
     }
-
-    // From workers (accountants, lawyers)
-    for (const [wId, count] of Object.entries(state.workers)) {
-      if (count <= 0) continue;
-      const workerDef = GAME_DATA.workers.find(w => w.id === wId);
-      if (workerDef && workerDef.launderRate > 0) {
-        rate += workerDef.launderRate * count;
-      }
-    }
-
-    // Upgrade: offshore accounts → efficiency (already in state.launderEfficiency)
-    // Launder multiplier from achievements
-    rate *= (state.launderMultiplier || 1);
-
+    rate *= (state.produceRateMult || 1);                  // upgrades/achievements
+    rate *= (state.mods.produceMult || 1);                 // events
+    rate *= getTerritoryBonus(state, 'produceSpeed');       // territory
     return rate;
   }
 
-  /* ── Heat generation per click ── */
-  function getHeatPerClick(state) {
-    const item = GAME_DATA.items.find(i => i.id === state.activeItem);
-    if (!item) return 0;
-    let h = item.heatPerClick;
-    h *= (state.heatMultiplier || 1); // multiplier < 1 reduces heat
-    // Underground district halves heat generation
-    if (state.districts.underground) h *= 0.5;
-    return h;
+  /* ── Bar fill rate (0→1 per second, includes manual + workers) ── */
+  function getProduceBarRate(state) {
+    const p = PRODUCTS.find(x => x.id === state.activeProduct);
+    if (!p) return 0;
+    const effectiveTime = p.produceTime / (state.produceSpeedMult || 1);
+    const workerFillRate = getAutoProduceRate(state) / Math.max(p.batchSize, 1);
+    // Workers contribute 1 unit = 1 bar-fill worth
+    const baseRate = 1 / Math.max(effectiveTime, 0.1);    // natural bar fill/s
+    return baseRate + workerFillRate;
   }
 
-  /* ── Heat penalty on income ── */
+  /* ── Auto-sell rate (units/s) ── */
+  function getAutoSellRate(state) {
+    let rate = 0;
+    for (const [wId, cnt] of Object.entries(state.workers)) {
+      if (!cnt) continue;
+      const w = WORKERS.find(x => x.id === wId);
+      if (w && w.sellRate > 0) rate += w.sellRate * cnt;
+    }
+    rate *= (state.sellRateMult || 1);
+    rate *= getTerritoryBonus(state, 'sellRate');
+    return rate;
+  }
+
+  /* ── Heat reduction/s ── */
+  function getHeatReduction(state) {
+    let r = 0;
+    for (const [wId, cnt] of Object.entries(state.workers)) {
+      if (!cnt) continue;
+      const w = WORKERS.find(x => x.id === wId);
+      if (w && w.heatReduce > 0) r += w.heatReduce * cnt;
+    }
+    if (state.territories.underground) r += 2;
+    return r;
+  }
+
+  /* ── Laundering rate ($/s) ── */
+  function getLaunderRate(state) {
+    let r = 0;
+    for (const [fId, cnt] of Object.entries(state.fronts)) {
+      if (!cnt) continue;
+      const f = FRONTS.find(x => x.id === fId);
+      if (f) r += f.rate * cnt;
+    }
+    for (const [wId, cnt] of Object.entries(state.workers)) {
+      if (!cnt) continue;
+      const w = WORKERS.find(x => x.id === wId);
+      if (w && w.launderRate > 0) r += w.launderRate * cnt;
+    }
+    r *= (state.launderRateMult || 1);
+    return r;
+  }
+
+  /* ── Heat per sale ── */
+  function getHeatPerSale(state, productId) {
+    const p = PRODUCTS.find(x => x.id === (productId || state.activeProduct));
+    if (!p) return 0;
+    return p.heatPerSale * (state.heatMult || 1) * getTerritoryHeatMult(state);
+  }
+
+  /* ── Heat penalty on prices ── */
   function getHeatPenalty(heat) {
-    if (heat < 25)  return 1.0;
-    if (heat < 50)  return 0.9;
-    if (heat < 75)  return 0.75;
-    if (heat < 90)  return 0.5;
-    return 0.25;
+    if (heat < 25) return 1.0;
+    if (heat < 50) return 0.90;
+    if (heat < 75) return 0.75;
+    if (heat < 90) return 0.55;
+    return 0.30;
   }
 
-  /* ── District multipliers ── */
-  function getDistrictClickMult(state) {
+  /* ── Territory helpers ── */
+  function getTerritoryBonus(state, key) {
     let mult = 1;
-    if (state.districts.downtown)   mult *= 1.25;
-    if (state.districts.richward)   mult *= 2.0;
-    if (state.districts.airport)    mult *= 3.0;
-    return mult;
-  }
-
-  function getDistrictWorkerMult(state, workerId) {
-    let mult = 1;
-    if (state.districts.industrial) mult *= 1.5;
-    if (state.districts.harbor && workerId === 'smuggler') mult *= 2.0;
-    if (state.districts.airport)    mult *= 3.0;
-    return mult;
-  }
-
-  /* ── Worker upgrade multiplier ── */
-  function getWorkerMult(state, workerId) {
-    let mult = 1;
-    const workerUpgrades = {
-      runner:   ['runner_boost'],
-      dealer:   ['dealer_phones'],
-      chemist:  ['chemist_lab'],
-      smuggler: ['smuggler_route']
-    };
-    const upgList = workerUpgrades[workerId] || [];
-    for (const upg of upgList) {
-      if (state.upgrades[upg]) {
-        const upgDef = GAME_DATA.upgrades.find(u => u.id === upg);
-        if (upgDef && upgDef.effect.type === 'workerMult') mult *= upgDef.effect.value;
-      }
+    for (const tId of Object.keys(state.territories)) {
+      if (!state.territories[tId]) continue;
+      const t = TERRITORIES.find(x => x.id === tId);
+      if (t && t.bonus[key]) mult *= t.bonus[key];
     }
     return mult;
   }
 
-  /* ── Worker cost (with scaling) ── */
-  function getWorkerCost(workerId, currentCount) {
-    const def = GAME_DATA.workers.find(w => w.id === workerId);
-    if (!def) return Infinity;
-    return Math.floor(def.cost * Math.pow(def.costMult, currentCount));
+  function getTerritoryHeatMult(state) {
+    let mult = 1;
+    for (const tId of Object.keys(state.territories)) {
+      if (!state.territories[tId]) continue;
+      const t = TERRITORIES.find(x => x.id === tId);
+      if (t && t.bonus.heatMult) mult *= t.bonus.heatMult;
+    }
+    return mult;
   }
 
-  /* ── Format currency ── */
-  function formatCash(n) {
-    if (n >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T';
-    if (n >= 1e9)  return '$' + (n / 1e9).toFixed(2) + 'B';
-    if (n >= 1e6)  return '$' + (n / 1e6).toFixed(2) + 'M';
-    if (n >= 1e3)  return '$' + (n / 1e3).toFixed(1) + 'K';
+  /* ── Worker cost with scaling ── */
+  function workerCost(workerId, currentCount) {
+    const w = WORKERS.find(x => x.id === workerId);
+    if (!w) return Infinity;
+    return Math.ceil(w.cost * Math.pow(w.mult, currentCount));
+  }
+
+  /* ── Formatting ── */
+  function fmt(n) {
+    if (n >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
+    if (n >= 1e9)  return '$' + (n/1e9).toFixed(2) + 'B';
+    if (n >= 1e6)  return '$' + (n/1e6).toFixed(2) + 'M';
+    if (n >= 1e3)  return '$' + (n/1e3).toFixed(1) + 'K';
     return '$' + Math.floor(n).toLocaleString();
   }
-
-  function formatNumber(n) {
-    if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
-    if (n >= 1e9)  return (n / 1e9).toFixed(2) + 'B';
-    if (n >= 1e6)  return (n / 1e6).toFixed(2) + 'M';
-    if (n >= 1e3)  return (n / 1e3).toFixed(1) + 'K';
+  function fmtNum(n) {
+    if (n >= 1e6) return (n/1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
     return Math.floor(n).toLocaleString();
   }
-
-  function formatTime(seconds) {
-    if (seconds < 60) return Math.floor(seconds) + 's';
-    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ' + (Math.floor(seconds) % 60) + 's';
-    return Math.floor(seconds / 3600) + 'h ' + Math.floor((seconds % 3600) / 60) + 'm';
+  function fmtTime(s) {
+    if (s < 60) return Math.floor(s) + 's';
+    if (s < 3600) return Math.floor(s/60) + 'm ' + (Math.floor(s)%60) + 's';
+    return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
   }
 
   return {
-    tickPrices, getPriceModifier,
-    getClickValue, getWorkerIncome, getHeatReduction, getLaunderRate,
-    getHeatPerClick, getHeatPenalty,
-    getDistrictClickMult, getDistrictWorkerMult, getWorkerMult,
-    getWorkerCost, formatCash, formatNumber, formatTime
+    tickPrices, getPriceMod,
+    getSellPrice, getAutoProduceRate, getProduceBarRate, getAutoSellRate,
+    getHeatReduction, getLaunderRate, getHeatPerSale, getHeatPenalty,
+    getTerritoryBonus, workerCost,
+    fmt, fmtNum, fmtTime
   };
-
 })();
