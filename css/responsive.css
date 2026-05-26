@@ -1,0 +1,155 @@
+/* responsive.css — Device-specific layout adjustments */
+
+/* ── Tablet (≤ 1024px) ── */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-w: 240px;
+    --footer-h: 180px;
+  }
+
+  #app {
+    grid-template-columns: var(--sidebar-w) 1fr var(--sidebar-w);
+  }
+
+  .deal-btn { width: 180px; height: 180px; }
+  .deal-btn__item { font-size: 15px; }
+
+  .header-stat { min-width: 80px; padding: 4px 8px; }
+  .header-stat__val { font-size: 12px; }
+}
+
+/* ── Mobile landscape / small tablet (≤ 768px) ── */
+@media (max-width: 768px) {
+  :root {
+    --header-h: 56px;
+    --footer-h: 160px;
+    --sidebar-w: 100%;
+  }
+
+  body { overflow-y: auto; }
+
+  #app {
+    height: auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  #game-header {
+    position: sticky;
+    top: 0;
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .header-brand__title { font-size: 14px; }
+  .header-stat { min-width: 70px; padding: 3px 6px; }
+  .header-stat__val { font-size: 11px; }
+  .header-stat__label { font-size: 8px; }
+
+  #left-panel, #right-panel {
+    width: 100%;
+    max-height: 350px;
+    border: none;
+    border-top: 1px solid var(--border);
+  }
+
+  #center-panel {
+    padding: 16px;
+    min-height: 320px;
+  }
+
+  .deal-btn { width: 160px; height: 160px; }
+  .deal-btn__item { font-size: 14px; }
+  .deal-btn__label { font-size: 11px; }
+
+  #game-footer {
+    grid-template-columns: 1fr;
+    height: auto;
+    max-height: 280px;
+  }
+
+  #notification-log {
+    border-right: none;
+    border-top: 1px solid var(--border);
+    max-height: 140px;
+  }
+
+  #heat-panel { padding: 10px; }
+
+  .action-buttons { gap: 6px; }
+  .action-buttons .btn { font-size: 10px; padding: 6px 10px; }
+
+  .center-stats { gap: 16px; }
+}
+
+/* ── Mobile portrait (≤ 480px) ── */
+@media (max-width: 480px) {
+  :root {
+    --header-h: auto;
+    --footer-h: 260px;
+  }
+
+  .header-brand { display: none; }
+
+  .header-stat { min-width: 60px; }
+  .header-stat__label { display: none; }
+  .header-stat__val { font-size: 13px; }
+
+  .deal-btn { width: 140px; height: 140px; }
+  .deal-btn__item { font-size: 13px; }
+  .deal-btn__label { font-size: 10px; letter-spacing: 1px; }
+
+  .panel-tab { font-size: 9px; padding: 8px 2px; }
+
+  .item-card__desc, .worker-card__desc, .front-card__desc { display: none; }
+
+  .district-card__flavor { display: none; }
+
+  #game-footer {
+    height: auto;
+    max-height: 300px;
+    --footer-h: 300px;
+  }
+
+  #notification-log { max-height: 160px; }
+}
+
+/* ── Large desktop (≥ 1440px) ── */
+@media (min-width: 1440px) {
+  :root {
+    --sidebar-w: 340px;
+    --footer-h: 220px;
+  }
+
+  .deal-btn { width: 250px; height: 250px; }
+  .deal-btn__item { font-size: 22px; }
+  .deal-btn__label { font-size: 15px; }
+  .deal-btn__value { font-size: 13px; }
+}
+
+/* ── Ultra-wide (≥ 1920px) ── */
+@media (min-width: 1920px) {
+  :root { --sidebar-w: 380px; }
+  html { font-size: 15px; }
+}
+
+/* ── High contrast preference ── */
+@media (prefers-contrast: high) {
+  :root {
+    --border: rgba(255,255,255,0.25);
+    --border-bright: rgba(255,255,255,0.45);
+    --text-secondary: #c0c0d0;
+  }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

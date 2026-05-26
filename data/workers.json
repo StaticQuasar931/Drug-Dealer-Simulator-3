@@ -1,0 +1,13 @@
+[
+  { "id": "runner",     "name": "Runner",         "incomePerSec": 0.1,  "cost": 50,      "costMult": 1.12, "heatReduce": 0,   "launderRate": 0,   "category": "street",     "desc": "Moves small quantities on foot." },
+  { "id": "dealer",     "name": "Street Dealer",  "incomePerSec": 0.8,  "cost": 250,     "costMult": 1.15, "heatReduce": 0,   "launderRate": 0,   "category": "street",     "desc": "Works a corner, builds regulars." },
+  { "id": "chemist",    "name": "Chemist",         "incomePerSec": 4,    "cost": 1500,    "costMult": 1.18, "heatReduce": 0,   "launderRate": 0,   "category": "production", "desc": "Improves product quality and output." },
+  { "id": "smuggler",   "name": "Smuggler",        "incomePerSec": 20,   "cost": 10000,   "costMult": 1.20, "heatReduce": 0,   "launderRate": 0,   "category": "logistics",  "desc": "Moves bulk. High income, high risk." },
+  { "id": "accountant", "name": "Accountant",      "incomePerSec": 0,    "cost": 5000,    "costMult": 1.25, "heatReduce": 0,   "launderRate": 50,  "category": "finance",    "desc": "Launders $50/s per accountant." },
+  { "id": "lookout",    "name": "Lookout",         "incomePerSec": 0,    "cost": 800,     "costMult": 1.20, "heatReduce": 0.3, "launderRate": 0,   "category": "security",   "desc": "Watches for cops. -0.3 heat/s each." },
+  { "id": "muscle",     "name": "Muscle",          "incomePerSec": 0,    "cost": 3000,    "costMult": 1.22, "heatReduce": 0.8, "launderRate": 0,   "category": "security",   "desc": "Intimidates rivals. -0.8 heat/s each." },
+  { "id": "hacker",     "name": "Hacker",          "incomePerSec": 0,    "cost": 15000,   "costMult": 1.30, "heatReduce": 2.0, "launderRate": 0,   "category": "security",   "desc": "Scrubs digital records. -2 heat/s each." },
+  { "id": "lawyer",     "name": "Lawyer",          "incomePerSec": 0,    "cost": 50000,   "costMult": 1.35, "heatReduce": 1.5, "launderRate": 100, "category": "finance",    "desc": "Keeps you clean. -1.5 heat/s + $100 launder/s." },
+  { "id": "fixer",      "name": "Fixer",           "incomePerSec": 100,  "cost": 100000,  "costMult": 1.40, "heatReduce": 3.0, "launderRate": 0,   "category": "logistics",  "desc": "Makes problems disappear." },
+  { "id": "cartel",     "name": "Cartel Contact",  "incomePerSec": 1000, "cost": 1000000, "costMult": 1.50, "heatReduce": 5.0, "launderRate": 500, "category": "elite",      "desc": "International supply chain. Game-changing." }
+]

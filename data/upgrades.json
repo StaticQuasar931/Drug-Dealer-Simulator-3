@@ -1,0 +1,16 @@
+[
+  { "id": "better_bags",     "name": "Better Packaging",    "cost": 500,     "effect": { "type": "clickMult",              "value": 2 },                        "req": { "cash": 200 },              "desc": "Quality packaging. 2× click value." },
+  { "id": "street_rep",      "name": "Street Reputation",   "cost": 1500,    "effect": { "type": "clickMult",              "value": 2 },                        "req": { "cash": 500 },              "desc": "Word of mouth. Another 2× click value." },
+  { "id": "runner_boost",    "name": "Runner Network",      "cost": 2000,    "effect": { "type": "workerMult", "worker": "runner",   "value": 3 },              "req": { "workers": { "runner": 5 } },"desc": "3× runner income." },
+  { "id": "dealer_phones",   "name": "Burner Phones",       "cost": 5000,    "effect": { "type": "workerMult", "worker": "dealer",   "value": 3 },              "req": { "workers": { "dealer": 3 } },"desc": "Faster communication. 3× dealer income." },
+  { "id": "chemist_lab",     "name": "Proper Lab",          "cost": 12000,   "effect": { "type": "workerMult", "worker": "chemist",  "value": 4 },              "req": { "workers": { "chemist": 2 } },"desc": "4× chemist production." },
+  { "id": "supply_chain",    "name": "Supply Chain Ops",    "cost": 30000,   "effect": { "type": "clickMult",              "value": 3 },                        "req": { "cash": 10000 },            "desc": "Wholesale pricing. 3× click value." },
+  { "id": "offshore",        "name": "Offshore Accounts",   "cost": 80000,   "effect": { "type": "launderEff",             "value": 0.95 },                     "req": { "cash": 50000 },            "desc": "Launder at 95% efficiency." },
+  { "id": "encrypted_comms", "name": "Encrypted Comms",     "cost": 50000,   "effect": { "type": "heatMult",               "value": 0.7 },                      "req": { "cash": 20000 },            "desc": "-30% heat generation." },
+  { "id": "smuggler_route",  "name": "Smuggler Route",      "cost": 150000,  "effect": { "type": "workerMult", "worker": "smuggler", "value": 5 },              "req": { "workers": { "smuggler": 2 } },"desc": "5× smuggler income." },
+  { "id": "cartel_connect",  "name": "Cartel Connections",  "cost": 500000,  "effect": { "type": "clickMult",              "value": 5 },                        "req": { "cash": 250000 },           "desc": "Cartel supply. 5× click value." },
+  { "id": "insider_police",  "name": "Insider (Police)",    "cost": 200000,  "effect": { "type": "heatMult",               "value": 0.5 },                      "req": { "cash": 100000 },           "desc": "-50% heat generation." },
+  { "id": "global_network",  "name": "Global Network",      "cost": 2000000, "effect": { "type": "allWorkerMult",          "value": 2 },                        "req": { "cash": 1000000 },          "desc": "2× ALL worker income." },
+  { "id": "quantum_crypto",  "name": "Quantum Crypto",      "cost": 5000000, "effect": { "type": "heatMult",               "value": 0.25 },                     "req": { "cash": 2000000 },          "desc": "-75% heat generation." },
+  { "id": "automation",      "name": "Full Automation",     "cost": 10000000,"effect": { "type": "clickMult",              "value": 10 },                       "req": { "cash": 5000000 },          "desc": "Automated empire. 10× click value." }
+]

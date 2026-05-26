@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Drug Dealer Simulator 3 — Idle Tycoon Empire Builder. A fictional underground trading game.">
+  <title>Drug Dealer Simulator 3</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/ui.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body class="dark-mode gfx-balanced anim-medium">
+
+<!-- ══════════════════════════════════════════
+     CONTENT WARNING MODAL
+══════════════════════════════════════════ -->
+<div id="content-warning-modal" class="modal-backdrop hidden">
+  <div class="modal" style="max-width:520px">
+    <div class="modal__title">⚠️ Content Notice</div>
+    <div class="modal__body">
+      <p>This game is for <span class="highlight">entertainment purposes only</span>.</p>
+      <p>It contains fictional depictions of underground contraband markets and references to substances in a stylized, tycoon-game context.</p>
+      <p><strong>None of this content is intended to encourage real-world illegal activity or harm anyone.</strong></p>
+      <p>Player discretion is advised. Recommended for ages 17+.</p>
+      <div id="cw-extra" class="hidden" style="margin-top:12px; padding:12px; border:1px solid var(--border); border-radius:8px; font-size:12px; color:var(--text-secondary)">
+        <p>Drug Dealer Simulator 3 is a work of fiction inspired by crime dramas and idle tycoon games. All substances and organizations depicted are entirely fictional. The game does not simulate, instruct, or glorify real-world illegal activity. If you or someone you know is struggling with substance issues, please reach out to a health professional.</p>
+      </div>
+    </div>
+    <div class="modal__actions">
+      <button id="cw-learn-more" class="btn">Learn More</button>
+      <button id="cw-continue"   class="btn btn--primary">I Understand — Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SETTINGS MODAL
+══════════════════════════════════════════ -->
+<div id="settings-modal" class="modal-backdrop hidden">
+  <div class="modal" style="max-width:460px">
+    <button class="modal__close" onclick="UI.toggleModal('settings-modal')">✕</button>
+    <div class="modal__title">⚙️ Settings</div>
+    <div class="modal__body">
+
+      <div class="settings-row">
+        <label>Graphics Quality</label>
+        <select id="setting-graphics" onchange="Game.updateSettings('graphics', this.value)">
+          <option value="low">Low</option>
+          <option value="balanced" selected>Balanced</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+
+      <div class="settings-row">
+        <label>Animation Intensity</label>
+        <select id="setting-anim" onchange="Game.updateSettings('animationIntensity', this.value)">
+          <option value="none">None</option>
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+
+      <div class="settings-row">
+        <label>Floating Cash Numbers</label>
+        <input type="checkbox" id="setting-float-text" checked
+          onchange="Game.updateSettings('showFloatingText', this.checked)">
+      </div>
+
+      <div class="settings-row">
+        <label>Notifications</label>
+        <input type="checkbox" id="setting-notifs" checked
+          onchange="Game.updateSettings('notifications', this.checked)">
+      </div>
+
+      <div class="settings-row" style="border:none; margin-top:16px; justify-content:flex-start; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn--primary" onclick="Game.manualSave(); UI.toggleModal('settings-modal')">💾 Save Game</button>
+        <button class="btn btn--danger"  onclick="Game.resetGame()">🗑️ Reset Game</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ADMIN PANEL (hidden — requires secret input)
+══════════════════════════════════════════ -->
+<div id="admin-modal" class="modal-backdrop hidden">
+  <div class="modal" style="max-width:420px">
+    <button class="modal__close" onclick="UI.toggleModal('admin-modal')">✕</button>
+    <div class="modal__title">🔧 Admin Panel</div>
+    <div class="modal__body">
+      <div class="admin-grid">
+        <button class="btn" id="admin-add-1k">+$1,000</button>
+        <button class="btn" id="admin-add-1m">+$1,000,000</button>
+        <button class="btn" id="admin-add-1b">+$1,000,000,000</button>
+        <button class="btn" id="admin-zero-heat">Zero Heat</button>
+        <button class="btn" id="admin-max-heat">Max Heat</button>
+        <button class="btn" id="admin-unlock-all">Unlock All</button>
+        <button class="btn btn--danger" id="admin-reset" style="grid-column:span 2">Reset Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MAIN APP
+══════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- ── HEADER ── -->
+  <header id="game-header">
+
+    <div class="header-brand">
+      <img src="assets/favicon.svg" alt="DDS3">
+      <div>
+        <div class="header-brand__title">Drug Dealer Simulator</div>
+        <div class="header-brand__sub">IDLE TYCOON &nbsp;·&nbsp; V3</div>
+      </div>
+    </div>
+
+    <div class="header-stat header-stat--dirty">
+      <span class="header-stat__label">💚 Dirty Cash</span>
+      <span class="header-stat__val" id="dirty-cash">$0</span>
+    </div>
+
+    <div class="header-stat header-stat--clean">
+      <span class="header-stat__label">💙 Clean Cash</span>
+      <span class="header-stat__val" id="clean-cash">$0</span>
+    </div>
+
+    <div class="header-stat header-stat--rate">
+      <span class="header-stat__label">📈 Income/s</span>
+      <span class="header-stat__val" id="income-rate">$0/s</span>
+    </div>
+
+    <div class="header-stat header-stat--laund">
+      <span class="header-stat__label">🧺 Launder/s</span>
+      <span class="header-stat__val" id="launder-rate">$0/s</span>
+    </div>
+
+    <div class="header-stat">
+      <span class="header-stat__label">📊 Total Earned</span>
+      <span class="header-stat__val" id="total-earned">$0</span>
+    </div>
+
+    <div class="header-stat header-stat--ach">
+      <span class="header-stat__label">🏆 Achievements</span>
+      <span class="header-stat__val" id="ach-count">0/29</span>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn" id="save-btn" title="Save">💾</button>
+      <button class="btn" id="settings-btn" title="Settings">⚙️</button>
+    </div>
+
+  </header>
+
+  <!-- ── LEFT PANEL ── -->
+  <aside id="left-panel">
+    <nav class="panel-tabs">
+      <div class="panel-tab active" data-tab="products">Products</div>
+      <div class="panel-tab" data-tab="upgrades">Upgrades</div>
+      <div class="panel-tab" data-tab="achievements">Trophies</div>
+    </nav>
+    <div id="left-panel-content">
+      <!-- Populated by UI.js -->
+    </div>
+  </aside>
+
+  <!-- ── CENTER PANEL ── -->
+  <main id="center-panel">
+
+    <!-- Active events -->
+    <div class="active-events" id="active-events"></div>
+
+    <!-- The big deal button -->
+    <button id="deal-btn" class="deal-btn deal-btn--safe" title="Click to make a deal">
+      <span class="deal-btn__label">MAKE A DEAL</span>
+      <span class="deal-btn__item" id="deal-item-name">Reggie</span>
+      <span class="deal-btn__value" id="deal-click-val">+$1 per deal</span>
+    </button>
+
+    <!-- Center stats -->
+    <div class="center-stats">
+      <div class="center-stat">
+        <span class="center-stat__val" id="cs-dirty">$0</span>
+        Dirty Cash
+      </div>
+      <div class="center-stat">
+        <span class="center-stat__val" id="cs-income">$0/s</span>
+        Auto Income
+      </div>
+      <div class="center-stat">
+        <span class="center-stat__val" id="cs-workers">0</span>
+        Workers
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="action-buttons">
+      <button id="lay-low-btn" class="btn">🕶️ Lay Low (-20 heat, $500)</button>
+      <button id="bribe-btn"   class="btn">💰 Bribe (-35 heat, $2k)</button>
+    </div>
+
+    <!-- Price ticker -->
+    <div class="price-ticker" id="price-ticker">Market: Normal</div>
+
+  </main>
+
+  <!-- ── RIGHT PANEL ── -->
+  <aside id="right-panel">
+    <nav class="panel-tabs">
+      <div class="panel-tab active" data-rtab="workers">Workers</div>
+      <div class="panel-tab" data-rtab="districts">Map</div>
+      <div class="panel-tab" data-rtab="fronts">Fronts</div>
+      <div class="panel-tab" data-rtab="stats">Stats</div>
+    </nav>
+    <div id="right-panel-content">
+      <!-- Populated by UI.js -->
+    </div>
+  </aside>
+
+  <!-- ── FOOTER ── -->
+  <footer id="game-footer">
+
+    <div id="notification-log">
+      <div class="section-title">Event Log</div>
+    </div>
+
+    <div id="heat-panel">
+      <div class="section-title">🌡️ Heat Level</div>
+      <div class="heat-bar-container">
+        <div id="heat-fill" class="heat-fill heat-fill--safe" style="width:0%"></div>
+      </div>
+      <div id="heat-label" class="heat-label">Heat: 0% — Safe</div>
+      <div class="heat-actions">
+        <button id="lay-low-btn-2"  class="btn btn--sm" onclick="Game.layLow()">🕶️ Lay Low</button>
+        <button id="bribe-btn-2"    class="btn btn--sm" onclick="Game.bribe()">💰 Bribe</button>
+      </div>
+      <div style="margin-top:8px; font-size:10px; color:var(--text-secondary); line-height:1.5">
+        <div>🟢 0–24: Safe &nbsp;|&nbsp; 🟡 25–49: Suspicious</div>
+        <div>🟠 50–74: Investigated &nbsp;|&nbsp; 🔴 75–89: Surveillance</div>
+        <div>🚨 90+: RAID RISK — Workers & cash at stake!</div>
+      </div>
+    </div>
+
+  </footer>
+
+</div><!-- #app -->
+
+<!-- ══════════════════════════════════════════
+     SCRIPTS (order matters — no modules)
+══════════════════════════════════════════ -->
+<script src="js/data.js"></script>
+<script src="js/saveSystem.js"></script>
+<script src="js/antiCheat.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/economy.js"></script>
+<script src="js/workers.js"></script>
+<script src="js/production.js"></script>
+<script src="js/map.js"></script>
+<script src="js/laundering.js"></script>
+<script src="js/events.js"></script>
+<script src="js/achievements.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+
+<!-- Price ticker update (simple inline) -->
+<script>
+  setInterval(() => {
+    const ticker = document.getElementById('price-ticker');
+    const priceTick = document.getElementById('cs-dirty');
+    if (!ticker || !Game) return;
+    const mod = Economy.getPriceModifier();
+    const pct = Math.round((mod - 1) * 100);
+    if (pct > 5) {
+      ticker.innerHTML = `Market: <span class="price-up">▲ +${pct}% — Hot!</span>`;
+    } else if (pct < -5) {
+      ticker.innerHTML = `Market: <span class="price-down">▼ ${pct}% — Slow</span>`;
+    } else {
+      ticker.textContent = 'Market: Normal';
+    }
+
+    // Sync center stats
+    const state = Game.getState();
+    if (priceTick) priceTick.textContent = Economy.formatCash(state.cash);
+    const csIncome = document.getElementById('cs-income');
+    if (csIncome) csIncome.textContent = Economy.formatCash(Economy.getWorkerIncome(state)) + '/s';
+    const csWorkers = document.getElementById('cs-workers');
+    if (csWorkers) csWorkers.textContent = Workers.getTotalWorkers(state);
+
+    // Active events display
+    const evEl = document.getElementById('active-events');
+    if (evEl) {
+      const active = Events.getActiveEvents();
+      if (active.length === 0) {
+        evEl.innerHTML = '';
+      } else {
+        evEl.innerHTML = active.map(ev =>
+          `<div class="event-badge">${ev.icon} ${ev.name} (${Math.ceil(ev.remaining)}s)</div>`
+        ).join('');
+      }
+    }
+  }, 500);
+</script>
+
+</body>
+</html>

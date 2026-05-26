@@ -1,0 +1,14 @@
+[
+  { "id": "market_boom",     "name": "Market Boom",        "type": "positive", "duration": 60,  "weight": 10, "effect": { "type": "incomeMult",  "value": 2    }, "desc": "High demand! Double income for 60 seconds." },
+  { "id": "supply_shortage", "name": "Supply Shortage",    "type": "negative", "duration": 45,  "weight": 8,  "effect": { "type": "incomeMult",  "value": 0.5  }, "desc": "Supply ran dry. Half income for 45 seconds." },
+  { "id": "informant",       "name": "Informant Spotted",  "type": "negative", "duration": 0,   "weight": 12, "effect": { "type": "heatAdd",     "value": 15   }, "desc": "Someone talked. +15 heat." },
+  { "id": "corrupt_cop",     "name": "Corrupt Cop Offer",  "type": "choice",   "duration": 0,   "weight": 6,  "effect": { "type": "bribe",       "value": 1000 }, "desc": "A cop wants a cut. Pay $1,000 or +25 heat." },
+  { "id": "market_crash",    "name": "Market Crash",       "type": "negative", "duration": 30,  "weight": 5,  "effect": { "type": "incomeMult",  "value": 0.25 }, "desc": "Market flooded. 25% income for 30 seconds." },
+  { "id": "new_contact",     "name": "New Contact",        "type": "positive", "duration": 0,   "weight": 8,  "effect": { "type": "cashBonus",   "value": 5    }, "desc": "Big spender walked in. Extra cash bonus!" },
+  { "id": "security_breach", "name": "Security Breach",    "type": "negative", "duration": 0,   "weight": 4,  "effect": { "type": "loseWorker",  "value": 1    }, "desc": "Someone got nabbed. Lost a worker." },
+  { "id": "rival_threat",    "name": "Rival Territory",    "type": "negative", "duration": 20,  "weight": 7,  "effect": { "type": "incomeMult",  "value": 0.75 }, "desc": "Rivals moving in. -25% income while active." },
+  { "id": "chemist_break",   "name": "Lab Breakthrough",   "type": "positive", "duration": 0,   "weight": 4,  "effect": { "type": "clickMult",   "value": 3, "temp": 120 }, "desc": "Chemist made a discovery! 3× click for 2min." },
+  { "id": "inspection",      "name": "Inspection Scare",   "type": "negative", "duration": 0,   "weight": 6,  "effect": { "type": "heatAdd",     "value": 30   }, "desc": "Business got inspected. +30 heat." },
+  { "id": "price_spike",     "name": "Price Spike",        "type": "positive", "duration": 90,  "weight": 9,  "effect": { "type": "incomeMult",  "value": 1.5  }, "desc": "Prices up! +50% income for 90 seconds." },
+  { "id": "blackout",        "name": "City Blackout",      "type": "mixed",    "duration": 40,  "weight": 3,  "effect": { "type": "blackout",    "value": 0    }, "desc": "Power's out. Police can't see you." }
+]

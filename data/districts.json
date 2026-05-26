@@ -1,0 +1,9 @@
+[
+  { "id": "school",      "name": "School Grounds",     "unlockCash": 0,       "bonus": { "type": "none",        "value": 0    }, "desc": "Where it all started. Low risk, low reward." },
+  { "id": "downtown",    "name": "Downtown",            "unlockCash": 5000,    "bonus": { "type": "clickMult",   "value": 1.25 }, "desc": "City center. High foot traffic, bigger deals." },
+  { "id": "industrial",  "name": "Industrial District", "unlockCash": 25000,   "bonus": { "type": "workerIncome","value": 1.50 }, "desc": "Warehouses and factories. Workers thrive here." },
+  { "id": "harbor",      "name": "Harbor",              "unlockCash": 100000,  "bonus": { "type": "smuggler",    "value": 2.00 }, "desc": "International shipping. Smugglers double income." },
+  { "id": "richward",    "name": "Rich Ward",           "unlockCash": 300000,  "bonus": { "type": "clickMult",   "value": 2.00 }, "desc": "Wealthy clientele. Premium prices." },
+  { "id": "airport",     "name": "Airport",             "unlockCash": 500000,  "bonus": { "type": "allIncome",   "value": 3.00 }, "desc": "Global connections. 3× all income." },
+  { "id": "underground", "name": "Underground Market",  "unlockCash": 2000000, "bonus": { "type": "heatReduce",  "value": 0.50 }, "desc": "Off the grid. -50% heat generation." }
+]

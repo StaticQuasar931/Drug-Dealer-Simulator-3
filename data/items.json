@@ -1,0 +1,16 @@
+[
+  { "id": "reggie",  "name": "Reggie",       "tier": 1, "category": "weed",        "clickValue": 1,     "heatPerClick": 0.30, "unlockCash": 0,       "desc": "Low-grade herb. The hustle starts here." },
+  { "id": "mid",     "name": "Mid Grade",    "tier": 1, "category": "weed",        "clickValue": 8,     "heatPerClick": 0.40, "unlockCash": 200,     "desc": "Decent quality. Word is spreading." },
+  { "id": "dank",    "name": "Dank",         "tier": 1, "category": "weed",        "clickValue": 40,    "heatPerClick": 0.50, "unlockCash": 1000,    "desc": "Premium herb. Got a real clientele now." },
+  { "id": "og",      "name": "OG Kush",      "tier": 2, "category": "weed",        "clickValue": 200,   "heatPerClick": 0.70, "unlockCash": 8000,    "desc": "Classic strain. High demand, high reward." },
+  { "id": "exotic",  "name": "Exotic",       "tier": 2, "category": "weed",        "clickValue": 1000,  "heatPerClick": 1.00, "unlockCash": 50000,   "desc": "Rare imports. The top shelf life." },
+  { "id": "shrooms", "name": "Shrooms",      "tier": 2, "category": "psychedelic", "clickValue": 500,   "heatPerClick": 0.80, "unlockCash": 20000,   "desc": "Magic mushrooms. A whole new market." },
+  { "id": "acid",    "name": "Acid",         "tier": 3, "category": "psychedelic", "clickValue": 2500,  "heatPerClick": 1.20, "unlockCash": 150000,  "desc": "LSD tabs. Festival season is booming." },
+  { "id": "pills",   "name": "Party Pills",  "tier": 3, "category": "party",       "clickValue": 1200,  "heatPerClick": 1.00, "unlockCash": 75000,   "desc": "Club staple. Everyone wants in." },
+  { "id": "molly",   "name": "Molly",        "tier": 3, "category": "party",       "clickValue": 6000,  "heatPerClick": 1.50, "unlockCash": 500000,  "desc": "Pure MDMA. The VIP treatment." },
+  { "id": "coke",    "name": "Cocaine",      "tier": 4, "category": "hard",        "clickValue": 30000, "heatPerClick": 2.00, "unlockCash": 3000000, "desc": "White gold. The big leagues call." },
+  { "id": "meth",    "name": "Ice",          "tier": 4, "category": "hard",        "clickValue": 15000, "heatPerClick": 1.80, "unlockCash": 1000000, "desc": "Crystal clear. High risk, high reward." },
+  { "id": "stolen",  "name": "Hot Goods",    "tier": 2, "category": "contraband",  "clickValue": 300,   "heatPerClick": 0.60, "unlockCash": 10000,   "desc": "Electronics, jewelry, whatever fell off a truck." },
+  { "id": "counter", "name": "Counterfeits", "tier": 3, "category": "contraband",  "clickValue": 5000,  "heatPerClick": 1.40, "unlockCash": 300000,  "desc": "Fake bills. Pass them carefully." },
+  { "id": "weapons", "name": "Hardware",     "tier": 4, "category": "contraband",  "clickValue": 20000, "heatPerClick": 2.50, "unlockCash": 2000000, "desc": "Unregistered pieces. Serious business." }
+]
