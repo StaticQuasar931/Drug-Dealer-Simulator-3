@@ -386,7 +386,7 @@ const PRODUCTS = [
     produceTime:9, batchSize:1, basePrice:110, heatPerSale:0.38,
     unlockCost:5000,
     desc:'Premium herb. Trichome-heavy.',
-    flavor:'They'll drive across the city for this.'
+    flavor:'They\'ll drive across the city for this.'
   },
   {
     id:'hash', name:'Hash (2g)', cat:'weed', tier:2,
